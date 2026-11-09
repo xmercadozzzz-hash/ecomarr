@@ -1,14 +1,7 @@
 from flask import (
-    Flask,
-    render_template,
-    request,
-    redirect,
-    url_for,
-    session,
-    flash,
-    jsonify
+    Flask, render_template, request, redirect,
+    url_for, session, flash, jsonify
 )
-
 
 import mysql.connector
 import datetime
@@ -16,10 +9,7 @@ import os
 import uuid
 
 from werkzeug.utils import secure_filename
-from werkzeug.security import (
-    generate_password_hash,
-    check_password_hash
-)
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 # ============================================================
@@ -28,48 +18,50 @@ from werkzeug.security import (
 
 app = Flask(__name__)
 
-app.secret_key = os.environ.get(
-    "SECRET_KEY",
-    "clave-local-desarrollo"
-)
-UPLOAD_FOLDER = os.path.join(
-    "static",
-    "uploads"
-)
+app.secret_key = os.environ.get("SECRET_KEY", "clave-local-desarrollo")
 
+# Ruta absoluta (más segura en Render)
+UPLOAD_FOLDER = os.path.join(app.root_path, "static", "uploads")
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-ALLOWED_EXTENSIONS = {
-    "png",
-    "jpg",
-    "jpeg",
-    "webp",
-    "gif"
-}
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
 
-os.makedirs(
-    UPLOAD_FOLDER,
-    exist_ok=True
-)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 # ============================================================
 # BASE DE DATOS
 # ============================================================
 
+# TEMPORAL: solo imprime longitudes (no los valores). Borra estas 3 líneas
+# cuando la conexión funcione.
+# Esperado: USER 16, PASS 20, NAME 20
+print("LEN USER:", len(os.environ.get("DB_USER", "")))
+print("LEN PASS:", len(os.environ.get("DB_PASSWORD", "")))
+print("LEN NAME:", len(os.environ.get("DB_NAME", "")))
 
 
 def conectar_bd():
     return mysql.connector.connect(
-        host=os.environ.get("DB_HOST", "localhost"),
-        user=os.environ.get("DB_USER", "root"),
-        password=os.environ.get("DB_PASSWORD", ""),
-        database=os.environ.get("DB_NAME", "ecomar"),
-        port=int(os.environ.get("DB_PORT", "3306")),
-        connection_timeout=15
+        host=os.environ.get("DB_HOST", "localhost").strip(),
+        port=int(os.environ.get("DB_PORT", "3306").strip()),
+        user=os.environ.get("DB_USER", "root").strip(),
+        password=os.environ.get("DB_PASSWORD", "").strip(),
+        database=os.environ.get("DB_NAME", "ecomar").strip(),
+        connection_timeout=15,
     )
 
 
+@app.errorhandler(mysql.connector.Error)
+def error_base_de_datos(error):
+    # Cualquier error de BD no capturado muestra esto en vez de un 500 feo
+    app.logger.error("Error de base de datos: %s", error)
+    return (
+        "<h1>Servicio temporalmente no disponible</h1>"
+        "<p>No pudimos conectar con la base de datos. "
+        "Intenta de nuevo en unos minutos.</p>",
+        503,
+    )
 
 
 # ============================================================
@@ -77,35 +69,36 @@ def conectar_bd():
 # ============================================================
 
 def archivo_permitido(nombre):
-
-    return (
-        "." in nombre
-        and nombre.rsplit(".", 1)[1].lower()
-        in ALLOWED_EXTENSIONS
-    )
+    return "." in nombre and nombre.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def usuario_logueado():
-
     return "usuario_id" in session
 
 
 def es_admin():
-
     return session.get("rol") == "admin"
 
 
 def cerrar_conexion(cursor, conexion):
-
     try:
-        cursor.close()
-    except:
+        if cursor:
+            cursor.close()
+    except Exception:
+        pass
+    try:
+        if conexion:
+            conexion.close()
+    except Exception:
         pass
 
+
+def a_decimal(valor):
+    # Un campo vacío ("") rompe columnas DECIMAL; lo convertimos a None
     try:
-        conexion.close()
-    except:
-        pass
+        return float(valor)
+    except (TypeError, ValueError):
+        return None
 
 
 # ============================================================
@@ -114,225 +107,97 @@ def cerrar_conexion(cursor, conexion):
 
 @app.route("/")
 def inicio():
+    reportes_recientes = []
+    conexion = cursor = None
 
-    conexion = conectar_bd()
+    # Si la BD falla, la portada igual carga (también sirve al health check)
+    try:
+        conexion = conectar_bd()
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT
+                r.id, r.nombre_lugar, r.ubicacion, r.tipo_contaminacion,
+                r.nivel_afectacion, r.descripcion, r.fotografia,
+                r.fecha_reporte, u.nombre AS usuario_nombre
+            FROM reportes r
+            LEFT JOIN usuarios u ON r.usuario_id = u.id
+            ORDER BY r.fecha_reporte DESC
+            LIMIT 3
+        """)
+        reportes_recientes = cursor.fetchall()
+    except mysql.connector.Error as error:
+        app.logger.error("Inicio sin BD: %s", error)
+    finally:
+        cerrar_conexion(cursor, conexion)
 
-    cursor = conexion.cursor(
-        dictionary=True
-    )
+    return render_template("index.html", reportes_recientes=reportes_recientes)
 
-    cursor.execute("""
-        SELECT
-            r.id,
-            r.nombre_lugar,
-            r.ubicacion,
-            r.tipo_contaminacion,
-            r.nivel_afectacion,
-            r.descripcion,
-            r.fotografia,
-            r.fecha_reporte,
-            u.nombre AS usuario_nombre
-        FROM reportes r
-        LEFT JOIN usuarios u
-            ON r.usuario_id = u.id
-        ORDER BY r.fecha_reporte DESC
-        LIMIT 3
-    """)
-
-    reportes_recientes = cursor.fetchall()
-
-    cerrar_conexion(
-        cursor,
-        conexion
-    )
-
-    return render_template(
-        "index.html",
-        reportes_recientes=reportes_recientes
-    )
 
 @app.route("/logout")
 def logout():
     session.clear()
     flash("Has cerrado sesión correctamente.", "success")
     return redirect(url_for("login"))
+
+
 # ============================================================
 # REGISTRO
 # ============================================================
 
 @app.route("/registro")
 def registro():
-
     if usuario_logueado():
-
-        if es_admin():
-
-            return redirect(
-                url_for("admin")
-            )
-
-        return redirect(
-            url_for("perfil")
-        )
-
-    return render_template(
-        "registro.html"
-    )
+        return redirect(url_for("admin" if es_admin() else "perfil"))
+    return render_template("registro.html")
 
 
-@app.route(
-    "/crear-cuenta",
-    methods=["POST"]
-)
+@app.route("/crear-cuenta", methods=["POST"])
 def crear_cuenta():
-
-    nombre = request.form.get(
-        "nombre",
-        ""
-    ).strip()
-
-    email = request.form.get(
-        "email",
-        ""
-    ).strip().lower()
-
-    password = request.form.get(
-        "password",
-        ""
-    )
-
-    confirmar_password = request.form.get(
-        "confirmar_password",
-        ""
-    )
-
+    nombre = request.form.get("nombre", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+    confirmar_password = request.form.get("confirmar_password", "")
 
     if not nombre or not email or not password:
-
-        flash(
-            "Todos los campos son obligatorios.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("registro")
-        )
-
+        flash("Todos los campos son obligatorios.", "danger")
+        return redirect(url_for("registro"))
 
     if password != confirmar_password:
-
-        flash(
-            "Las contraseñas no coinciden.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("registro")
-        )
-
+        flash("Las contraseñas no coinciden.", "danger")
+        return redirect(url_for("registro"))
 
     if len(password) < 6:
-
-        flash(
-            "La contraseña debe tener mínimo 6 caracteres.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("registro")
-        )
-
+        flash("La contraseña debe tener mínimo 6 caracteres.", "danger")
+        return redirect(url_for("registro"))
 
     conexion = conectar_bd()
-
     cursor = conexion.cursor()
 
+    cursor.execute("SELECT id FROM usuarios WHERE email = %s", (email,))
+
+    if cursor.fetchone():
+        cerrar_conexion(cursor, conexion)
+        flash("Ya existe una cuenta con ese correo.", "warning")
+        return redirect(url_for("registro"))
 
     cursor.execute(
         """
-        SELECT id
-        FROM usuarios
-        WHERE email = %s
+        INSERT INTO usuarios (nombre, email, password, rol)
+        VALUES (%s, %s, %s, 'usuario')
         """,
-        (email,)
+        (nombre, email, generate_password_hash(password))
     )
-
-    usuario_existente = cursor.fetchone()
-
-
-    if usuario_existente:
-
-        cerrar_conexion(
-            cursor,
-            conexion
-        )
-
-        flash(
-            "Ya existe una cuenta con ese correo.",
-            "warning"
-        )
-
-        return redirect(
-            url_for("registro")
-        )
-
-
-    password_segura = generate_password_hash(
-        password
-    )
-
-
-    cursor.execute(
-        """
-        INSERT INTO usuarios
-        (
-            nombre,
-            email,
-            password,
-            rol
-        )
-        VALUES
-        (
-            %s,
-            %s,
-            %s,
-            'usuario'
-        )
-        """,
-        (
-            nombre,
-            email,
-            password_segura
-        )
-    )
-
-
     conexion.commit()
-
     usuario_id = cursor.lastrowid
-
-
-    cerrar_conexion(
-        cursor,
-        conexion
-    )
-
+    cerrar_conexion(cursor, conexion)
 
     session["usuario_id"] = usuario_id
     session["usuario_nombre"] = nombre
     session["usuario_email"] = email
     session["rol"] = "usuario"
 
-
-    flash(
-        "Cuenta creada correctamente.",
-        "success"
-    )
-
-
-    return redirect(
-        url_for("perfil")
-    )
+    flash("Cuenta creada correctamente.", "success")
+    return redirect(url_for("perfil"))
 
 
 # ============================================================
@@ -341,146 +206,53 @@ def crear_cuenta():
 
 @app.route("/login")
 def login():
-
     if usuario_logueado():
-
-        if es_admin():
-
-            return redirect(
-                url_for("admin")
-            )
-
-        return redirect(
-            url_for("perfil")
-        )
-
-    return render_template(
-        "login.html"
-    )
+        return redirect(url_for("admin" if es_admin() else "perfil"))
+    return render_template("login.html")
 
 
-@app.route(
-    "/iniciar-sesion",
-    methods=["POST"]
-)
+@app.route("/iniciar-sesion", methods=["POST"])
 def iniciar_sesion():
-
-    email = request.form.get(
-        "email",
-        ""
-    ).strip().lower()
-
-    password = request.form.get(
-        "password",
-        ""
-    )
-
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
 
     if not email or not password:
-
-        flash(
-            "Debes ingresar el correo y la contraseña.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("login")
-        )
-
+        flash("Debes ingresar el correo y la contraseña.", "danger")
+        return redirect(url_for("login"))
 
     conexion = conectar_bd()
-
-    cursor = conexion.cursor(
-        dictionary=True
-    )
-
-
+    cursor = conexion.cursor(dictionary=True)
     cursor.execute(
         """
-        SELECT
-            id,
-            nombre,
-            email,
-            password,
-            rol
+        SELECT id, nombre, email, password, rol
         FROM usuarios
         WHERE email = %s
         """,
         (email,)
     )
-
-
     usuario = cursor.fetchone()
+    cerrar_conexion(cursor, conexion)
 
-
-    cerrar_conexion(
-        cursor,
-        conexion
-    )
-
-
-    if not usuario:
-
-        flash(
-            "El correo o la contraseña son incorrectos.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("login")
-        )
-
-
-    if not check_password_hash(
-        usuario["password"],
-        password
-    ):
-
-        flash(
-            "El correo o la contraseña son incorrectos.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("login")
-        )
-
+    if not usuario or not check_password_hash(usuario["password"], password):
+        flash("El correo o la contraseña son incorrectos.", "danger")
+        return redirect(url_for("login"))
 
     session["usuario_id"] = usuario["id"]
     session["usuario_nombre"] = usuario["nombre"]
     session["usuario_email"] = usuario["email"]
     session["rol"] = usuario["rol"]
 
-
     if usuario["rol"] == "admin":
+        return redirect(url_for("admin"))
 
-        return redirect(
-            url_for("admin")
-        )
+    return redirect(url_for("perfil"))
 
-
-    return redirect(
-        url_for("perfil")
-    )
-
-
-# ============================================================
-# CERRAR SESIÓN
-# ============================================================
 
 @app.route("/cerrar-sesion")
 def cerrar_sesion():
-
     session.clear()
-
-    flash(
-        "Sesión cerrada correctamente.",
-        "success"
-    )
-
-    return redirect(
-        url_for("inicio")
-    )
+    flash("Sesión cerrada correctamente.", "success")
+    return redirect(url_for("inicio"))
 
 
 # ============================================================
@@ -489,64 +261,32 @@ def cerrar_sesion():
 
 @app.route("/perfil")
 def perfil():
-
     if not usuario_logueado():
-
-        return redirect(
-            url_for("login")
-        )
-
+        return redirect(url_for("login"))
 
     conexion = conectar_bd()
-
-    cursor = conexion.cursor(
-        dictionary=True
-    )
-
+    cursor = conexion.cursor(dictionary=True)
 
     cursor.execute(
         """
-        SELECT
-            id,
-            nombre,
-            email,
-            fecha_registro,
-            rol
+        SELECT id, nombre, email, fecha_registro, rol
         FROM usuarios
         WHERE id = %s
         """,
         (session["usuario_id"],)
     )
-
-
     usuario = cursor.fetchone()
 
-
     cursor.execute(
-        """
-        SELECT COUNT(*) AS total
-        FROM reportes
-        WHERE usuario_id = %s
-        """,
+        "SELECT COUNT(*) AS total FROM reportes WHERE usuario_id = %s",
         (session["usuario_id"],)
     )
+    total_reportes = cursor.fetchone()["total"]
 
-
-    resultado = cursor.fetchone()
-
-    total_reportes = resultado["total"]
-
-
-    cerrar_conexion(
-        cursor,
-        conexion
-    )
-
+    cerrar_conexion(cursor, conexion)
 
     return render_template(
-        "perfil.html",
-        usuario=usuario,
-        total_reportes=total_reportes
+        "perfil.html", usuario=usuario, total_reportes=total_reportes
     )
 
 
@@ -556,212 +296,76 @@ def perfil():
 
 @app.route("/reportar")
 def reportar():
-
     if not usuario_logueado():
-
-        flash(
-            "Debes iniciar sesión para realizar un reporte.",
-            "warning"
-        )
-
-        return redirect(
-            url_for("login")
-        )
-
-    return render_template(
-        "reportar.html"
-    )
+        flash("Debes iniciar sesión para realizar un reporte.", "warning")
+        return redirect(url_for("login"))
+    return render_template("reportar.html")
 
 
-# ============================================================
-# GUARDAR REPORTE
-# ============================================================
-
-@app.route(
-    "/crear-reporte",
-    methods=["POST"]
-)
+@app.route("/crear-reporte", methods=["POST"])
 def crear_reporte():
-
     if not usuario_logueado():
+        return redirect(url_for("login"))
 
-        return redirect(
-            url_for("login")
-        )
-
-
-    nombre_lugar = request.form.get(
-        "nombre_lugar",
-        ""
-    ).strip()
-
-    ubicacion = request.form.get(
-        "ubicacion",
-        ""
-    ).strip()
-
-    latitud = request.form.get(
-        "latitud"
-    )
-
-    longitud = request.form.get(
-        "longitud"
-    )
-
-    tipo_contaminacion = request.form.get(
-        "tipo_contaminacion",
-        ""
-    ).strip()
-
-    nivel_afectacion = request.form.get(
-        "nivel_afectacion",
-        ""
-    ).strip()
-
-    descripcion = request.form.get(
-        "descripcion",
-        ""
-    ).strip()
-
-
-    fotografia = request.files.get(
-        "fotografia"
-    )
-
+    nombre_lugar = request.form.get("nombre_lugar", "").strip()
+    ubicacion = request.form.get("ubicacion", "").strip()
+    latitud = a_decimal(request.form.get("latitud"))
+    longitud = a_decimal(request.form.get("longitud"))
+    tipo_contaminacion = request.form.get("tipo_contaminacion", "").strip()
+    nivel_afectacion = request.form.get("nivel_afectacion", "").strip()
+    descripcion = request.form.get("descripcion", "").strip()
+    fotografia = request.files.get("fotografia")
 
     if not nombre_lugar:
-
-        flash(
-            "Debes indicar el lugar.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("reportar")
-        )
-
+        flash("Debes indicar el lugar.", "danger")
+        return redirect(url_for("reportar"))
 
     if not ubicacion:
-
-        flash(
-            "Debes indicar la ubicación.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("reportar")
-        )
-
+        flash("Debes indicar la ubicación.", "danger")
+        return redirect(url_for("reportar"))
 
     nombre_fotografia = None
 
-
     if fotografia and fotografia.filename:
 
-        if not archivo_permitido(
-            fotografia.filename
-        ):
+        if not archivo_permitido(fotografia.filename):
+            flash("El formato de imagen no está permitido.", "danger")
+            return redirect(url_for("reportar"))
 
-            flash(
-                "El formato de imagen no está permitido.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("reportar")
-            )
-
-
-        extension = fotografia.filename.rsplit(
-            ".",
-            1
-        )[1].lower()
-
-
-        nombre_fotografia = (
-            str(uuid.uuid4())
-            + "."
-            + extension
-        )
-
-
-        ruta = os.path.join(
-            app.config["UPLOAD_FOLDER"],
-            secure_filename(
-                nombre_fotografia
-            )
-        )
-
+        extension = fotografia.filename.rsplit(".", 1)[1].lower()
+        nombre_fotografia = str(uuid.uuid4()) + "." + extension
 
         fotografia.save(
-            ruta
+            os.path.join(
+                app.config["UPLOAD_FOLDER"],
+                secure_filename(nombre_fotografia)
+            )
         )
 
-
     conexion = conectar_bd()
-
     cursor = conexion.cursor()
-
 
     cursor.execute(
         """
         INSERT INTO reportes
         (
-            nombre_lugar,
-            ubicacion,
-            latitud,
-            longitud,
-            tipo_contaminacion,
-            nivel_afectacion,
-            descripcion,
-            fotografia,
-            usuario_id
+            nombre_lugar, ubicacion, latitud, longitud,
+            tipo_contaminacion, nivel_afectacion, descripcion,
+            fotografia, usuario_id
         )
-        VALUES
-        (
-            %s,
-            %s,
-            %s,
-            %s,
-            %s,
-            %s,
-            %s,
-            %s,
-            %s
-        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
-            nombre_lugar,
-            ubicacion,
-            latitud,
-            longitud,
-            tipo_contaminacion,
-            nivel_afectacion,
-            descripcion,
-            nombre_fotografia,
-            session["usuario_id"]
+            nombre_lugar, ubicacion, latitud, longitud,
+            tipo_contaminacion, nivel_afectacion, descripcion,
+            nombre_fotografia, session["usuario_id"]
         )
     )
-
-
     conexion.commit()
+    cerrar_conexion(cursor, conexion)
 
-
-    cerrar_conexion(
-        cursor,
-        conexion
-    )
-
-
-    flash(
-        "Reporte registrado correctamente.",
-        "success"
-    )
-
-
-    return redirect(
-        url_for("reportes")
-    )
+    flash("Reporte registrado correctamente.", "success")
+    return redirect(url_for("reportes"))
 
 
 # ============================================================
@@ -770,49 +374,22 @@ def crear_reporte():
 
 @app.route("/reportes")
 def reportes():
-
     conexion = conectar_bd()
+    cursor = conexion.cursor(dictionary=True)
 
-    cursor = conexion.cursor(
-        dictionary=True
-    )
-
-
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT
-            r.id,
-            r.nombre_lugar,
-            r.ubicacion,
-            r.latitud,
-            r.longitud,
-            r.tipo_contaminacion,
-            r.nivel_afectacion,
-            r.descripcion,
-            r.fotografia,
-            r.fecha_reporte,
-            u.nombre AS usuario_nombre
+            r.id, r.nombre_lugar, r.ubicacion, r.latitud, r.longitud,
+            r.tipo_contaminacion, r.nivel_afectacion, r.descripcion,
+            r.fotografia, r.fecha_reporte, u.nombre AS usuario_nombre
         FROM reportes r
-        LEFT JOIN usuarios u
-            ON r.usuario_id = u.id
+        LEFT JOIN usuarios u ON r.usuario_id = u.id
         ORDER BY r.fecha_reporte DESC
-        """
-    )
+    """)
+    lista = cursor.fetchall()
+    cerrar_conexion(cursor, conexion)
 
-
-    reportes = cursor.fetchall()
-
-
-    cerrar_conexion(
-        cursor,
-        conexion
-    )
-
-
-    return render_template(
-        "reportes.html",
-        reportes=reportes
-    )
+    return render_template("reportes.html", reportes=lista)
 
 
 # ============================================================
@@ -821,219 +398,113 @@ def reportes():
 
 @app.route("/mapas")
 def mapas():
-
     conexion = conectar_bd()
+    cursor = conexion.cursor(dictionary=True)
 
-    cursor = conexion.cursor(
-        dictionary=True
-    )
-
-
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT
-            r.id,
-            r.nombre_lugar,
-            r.ubicacion,
-            r.latitud,
-            r.longitud,
-            r.tipo_contaminacion,
-            r.nivel_afectacion,
-            r.descripcion,
-            r.fotografia,
-            r.fecha_reporte,
-            u.nombre AS usuario_nombre
+            r.id, r.nombre_lugar, r.ubicacion, r.latitud, r.longitud,
+            r.tipo_contaminacion, r.nivel_afectacion, r.descripcion,
+            r.fotografia, r.fecha_reporte, u.nombre AS usuario_nombre
         FROM reportes r
-        LEFT JOIN usuarios u
-            ON r.usuario_id = u.id
-        WHERE r.latitud IS NOT NULL
-        AND r.longitud IS NOT NULL
+        LEFT JOIN usuarios u ON r.usuario_id = u.id
+        WHERE r.latitud IS NOT NULL AND r.longitud IS NOT NULL
         ORDER BY r.fecha_reporte DESC
-        """
-    )
+    """)
+    lista = cursor.fetchall()
+    cerrar_conexion(cursor, conexion)
 
+    return render_template("mapas.html", reportes=lista)
 
-    reportes = cursor.fetchall()
-
-
-    cerrar_conexion(
-        cursor,
-        conexion
-    )
-
-
-    return render_template(
-        "mapas.html",
-        reportes=reportes
-    )
 
 # ============================================================
-# API DE REPORTES PARA EL MAPA DEL ADMIN
+# APIs DE REPORTES PARA EL MAPA
 # ============================================================
+
+SQL_REPORTES_MAPA = """
+    SELECT
+        r.id, r.nombre_lugar, r.ubicacion, r.barrio, r.latitud,
+        r.longitud, r.tipo_contaminacion, r.nivel_afectacion,
+        r.descripcion, r.fotografia, r.fecha_reporte,
+        u.nombre AS usuario_nombre
+    FROM reportes r
+    LEFT JOIN usuarios u ON r.usuario_id = u.id
+    WHERE r.latitud IS NOT NULL AND r.longitud IS NOT NULL
+    ORDER BY r.fecha_reporte DESC
+"""
+
 
 @app.route("/api/reportes")
 def api_reportes():
-
     if not usuario_logueado():
-
-        return jsonify({
-            "error": "No autorizado"
-        }), 401
+        return jsonify({"error": "No autorizado"}), 401
 
     if not es_admin():
-
-        return jsonify({
-            "error": "No tienes permisos"
-        }), 403
+        return jsonify({"error": "No tienes permisos"}), 403
 
     conexion = conectar_bd()
+    cursor = conexion.cursor(dictionary=True)
+    cursor.execute(SQL_REPORTES_MAPA)
+    datos = cursor.fetchall()
+    cerrar_conexion(cursor, conexion)
 
-    cursor = conexion.cursor(
-        dictionary=True
-    )
+    return jsonify(datos)
 
-    cursor.execute(
-        """
-        SELECT
-            r.id,
-            r.nombre_lugar,
-            r.ubicacion,
-            r.barrio,
-            r.latitud,
-            r.longitud,
-            r.tipo_contaminacion,
-            r.nivel_afectacion,
-            r.descripcion,
-            r.fotografia,
-            r.fecha_reporte,
-            u.nombre AS usuario_nombre
-        FROM reportes r
-        LEFT JOIN usuarios u
-            ON r.usuario_id = u.id
-        WHERE r.latitud IS NOT NULL
-        AND r.longitud IS NOT NULL
-        ORDER BY r.fecha_reporte DESC
-        """
-    )
 
-    reportes = cursor.fetchall()
+@app.route("/api/reportes-publicos")
+def api_reportes_publicos():
+    conexion = conectar_bd()
+    cursor = conexion.cursor(dictionary=True)
+    cursor.execute(SQL_REPORTES_MAPA)
+    datos = cursor.fetchall()
+    cerrar_conexion(cursor, conexion)
 
-    cerrar_conexion(
-        cursor,
-        conexion
-    )
+    return jsonify(datos)
 
-    return jsonify(reportes)
+
 # ============================================================
 # ELIMINAR REPORTE
 # ============================================================
 
-@app.route(
-    "/eliminar-reporte/<int:id>",
-    methods=["POST"]
-)
+@app.route("/eliminar-reporte/<int:id>", methods=["POST"])
 def eliminar_reporte(id):
-
     if not usuario_logueado():
-
-        return redirect(
-            url_for("login")
-        )
-
+        return redirect(url_for("login"))
 
     if not es_admin():
-
-        flash(
-            "No tienes permisos para eliminar reportes.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("reportes")
-        )
-
+        flash("No tienes permisos para eliminar reportes.", "danger")
+        return redirect(url_for("reportes"))
 
     conexion = conectar_bd()
+    cursor = conexion.cursor(dictionary=True)
 
-    cursor = conexion.cursor(
-        dictionary=True
-    )
-
-
-    cursor.execute(
-        """
-        SELECT fotografia
-        FROM reportes
-        WHERE id = %s
-        """,
-        (id,)
-    )
-
-
+    cursor.execute("SELECT fotografia FROM reportes WHERE id = %s", (id,))
     reporte = cursor.fetchone()
 
-
     if reporte and reporte["fotografia"]:
-
         ruta = os.path.join(
             app.config["UPLOAD_FOLDER"],
-            reporte["fotografia"]
+            secure_filename(reporte["fotografia"])
         )
-
         if os.path.exists(ruta):
-
             os.remove(ruta)
 
-
-    cursor.execute(
-        """
-        DELETE FROM reportes
-        WHERE id = %s
-        """,
-        (id,)
-    )
-
-
+    cursor.execute("DELETE FROM reportes WHERE id = %s", (id,))
     conexion.commit()
+    cerrar_conexion(cursor, conexion)
 
-
-    cerrar_conexion(
-        cursor,
-        conexion
-    )
-
-
-    flash(
-        "Reporte eliminado correctamente.",
-        "success"
-    )
-
-
-    return redirect(
-        url_for("reportes")
-    )
+    flash("Reporte eliminado correctamente.", "success")
+    return redirect(url_for("reportes"))
 
 
 # ============================================================
 # JORNADAS · UTILIDADES
 # ============================================================
-# La prioridad de una jornada sale del nivel de afectación del
-# reporte que se va a atender:  Crítico (4) > Alto (3) > Medio (2) > Bajo (1)
+# Prioridad según el nivel de afectación: Crítico (4) > Alto (3) > Medio (2) > Bajo (1)
 
-PRIORIDADES = {
-    "crítico": 4,
-    "critico": 4,
-    "alto": 3,
-    "medio": 2,
-    "bajo": 1
-}
+PRIORIDADES = {"crítico": 4, "critico": 4, "alto": 3, "medio": 2, "bajo": 1}
 
-NOMBRES_PRIORIDAD = {
-    4: "Crítico",
-    3: "Alto",
-    2: "Medio",
-    1: "Bajo"
-}
+NOMBRES_PRIORIDAD = {4: "Crítico", 3: "Alto", 2: "Medio", 1: "Bajo"}
 
 DIAS_SEMANA = [
     "Lunes", "Martes", "Miércoles", "Jueves",
@@ -1049,15 +520,10 @@ ESTADOS_JORNADA = ("disponible", "completada", "cancelada")
 
 
 def prioridad_desde_nivel(nivel):
-
-    return PRIORIDADES.get(
-        (nivel or "").strip().lower(),
-        1
-    )
+    return PRIORIDADES.get((nivel or "").strip().lower(), 1)
 
 
 def a_fecha(valor):
-
     if isinstance(valor, datetime.datetime):
         return valor.date()
 
@@ -1065,7 +531,6 @@ def a_fecha(valor):
         return valor
 
     if isinstance(valor, str):
-
         try:
             return datetime.date.fromisoformat(valor[:10])
         except ValueError:
@@ -1075,30 +540,18 @@ def a_fecha(valor):
 
 
 def a_hora(valor):
-
     # MySQL devuelve las columnas TIME como timedelta
-
     if isinstance(valor, datetime.timedelta):
-
         segundos = int(valor.total_seconds()) % 86400
-
-        return datetime.time(
-            segundos // 3600,
-            (segundos % 3600) // 60
-        )
+        return datetime.time(segundos // 3600, (segundos % 3600) // 60)
 
     if isinstance(valor, datetime.time):
         return valor.replace(second=0, microsecond=0)
 
     if isinstance(valor, str):
-
         for formato in ("%H:%M:%S", "%H:%M"):
-
             try:
-                return datetime.datetime.strptime(
-                    valor,
-                    formato
-                ).time()
+                return datetime.datetime.strptime(valor, formato).time()
             except ValueError:
                 pass
 
@@ -1106,7 +559,6 @@ def a_hora(valor):
 
 
 def texto_fecha(fecha):
-
     return (
         f"{DIAS_SEMANA[fecha.weekday()]} "
         f"{fecha.day} de {MESES[fecha.month - 1]} de {fecha.year}"
@@ -1114,26 +566,19 @@ def texto_fecha(fecha):
 
 
 def texto_hora(hora):
-
     h = hora.hour % 12 or 12
-
     sufijo = "a. m." if hora.hour < 12 else "p. m."
-
     return f"{h}:{hora.minute:02d} {sufijo}"
 
 
 def normalizar_jornada(fila, ahora):
-
     fecha = a_fecha(fila["fecha"])
-
     hora = a_hora(fila["hora"]) or datetime.time(0, 0)
 
     if not fecha:
         return None
 
-    prioridad = int(fila.get("prioridad") or 1)
-    prioridad = max(1, min(4, prioridad))
-
+    prioridad = max(1, min(4, int(fila.get("prioridad") or 1)))
     cupos = int(fila.get("cupos") or 0)
     inscritos = int(fila.get("inscritos") or 0)
 
@@ -1160,20 +605,20 @@ def normalizar_jornada(fila, ahora):
     }
 
 
-def preparar_tablas():
+def ahora_local():
+    # Render usa hora UTC; Colombia es UTC-5 (sin horario de verano)
+    return datetime.datetime.utcnow() - datetime.timedelta(hours=5)
 
+
+def preparar_tablas():
     """
     Crea / actualiza las tablas de jornadas si hace falta.
     Se puede ejecutar todas las veces que se quiera.
     """
-
-    conexion = None
-    cursor = None
+    conexion = cursor = None
 
     try:
-
         conexion = conectar_bd()
-
         cursor = conexion.cursor()
 
         cursor.execute("""
@@ -1197,7 +642,6 @@ def preparar_tablas():
         )
 
         for nombre, definicion in columnas_nuevas:
-
             cursor.execute("""
                 SELECT COUNT(*)
                 FROM information_schema.COLUMNS
@@ -1207,14 +651,11 @@ def preparar_tablas():
             """, (nombre,))
 
             if cursor.fetchone()[0] == 0:
-
                 cursor.execute(
                     f"ALTER TABLE jornadas ADD COLUMN {nombre} {definicion}"
                 )
 
         # si "estado" fuera un ENUM antiguo, lo pasamos a texto
-        # para poder usar 'completada' y 'cancelada'
-
         cursor.execute("""
             SELECT DATA_TYPE
             FROM information_schema.COLUMNS
@@ -1222,11 +663,9 @@ def preparar_tablas():
             AND TABLE_NAME = 'jornadas'
             AND COLUMN_NAME = 'estado'
         """)
-
         tipo = cursor.fetchone()
 
         if tipo and str(tipo[0]).lower() == "enum":
-
             cursor.execute("""
                 ALTER TABLE jornadas
                 MODIFY estado VARCHAR(20) NOT NULL DEFAULT 'disponible'
@@ -1245,11 +684,9 @@ def preparar_tablas():
         conexion.commit()
 
     except mysql.connector.Error as error:
-
         print("No se pudieron preparar las tablas de jornadas:", error)
 
     finally:
-
         cerrar_conexion(cursor, conexion)
 
 
@@ -1259,50 +696,30 @@ def preparar_tablas():
 
 @app.route("/jornadas")
 def jornadas():
-
     admin_vista = usuario_logueado() and es_admin()
-
-    ahora = datetime.datetime.now()
+    ahora = ahora_local()
 
     lista = []
     pendientes = []
-
-    conexion = None
-    cursor = None
+    conexion = cursor = None
 
     try:
-
         conexion = conectar_bd()
+        cursor = conexion.cursor(dictionary=True)
 
-        cursor = conexion.cursor(
-            dictionary=True
-        )
-
-        # mayor prioridad primero, y dentro de cada prioridad, la más próxima
-
+        # mayor prioridad primero, y dentro de cada una, la más próxima
         cursor.execute(
             """
             SELECT
-                j.id,
-                j.titulo,
-                j.descripcion,
-                j.lugar,
-                j.fecha,
-                j.hora,
-                j.cupos,
-                j.estado,
-                j.reporte_id,
-                j.prioridad,
+                j.id, j.titulo, j.descripcion, j.lugar, j.fecha, j.hora,
+                j.cupos, j.estado, j.reporte_id, j.prioridad,
                 (
-                    SELECT COUNT(*)
-                    FROM inscripciones_jornada i
+                    SELECT COUNT(*) FROM inscripciones_jornada i
                     WHERE i.jornada_id = j.id
                 ) AS inscritos,
                 (
-                    SELECT COUNT(*)
-                    FROM inscripciones_jornada i
-                    WHERE i.jornada_id = j.id
-                    AND i.usuario_id = %s
+                    SELECT COUNT(*) FROM inscripciones_jornada i
+                    WHERE i.jornada_id = j.id AND i.usuario_id = %s
                 ) AS yo
             FROM jornadas j
             ORDER BY j.prioridad DESC, j.fecha ASC, j.hora ASC
@@ -1311,55 +728,35 @@ def jornadas():
         )
 
         for fila in cursor.fetchall():
-
             jornada = normalizar_jornada(fila, ahora)
 
             if not jornada:
                 continue
 
-            # el usuario solo ve lo que puede hacer:
-            # jornadas disponibles que todavía no han pasado
-
+            # el usuario solo ve jornadas disponibles que no han pasado
             if not admin_vista:
-
-                if jornada["estado"] != "disponible":
-                    continue
-
-                if jornada["vencida"]:
+                if jornada["estado"] != "disponible" or jornada["vencida"]:
                     continue
 
             lista.append(jornada)
 
         # reportes que aún no tienen jornada (solo para el admin)
-
         if admin_vista:
-
             cursor.execute(
                 """
                 SELECT
-                    r.id,
-                    r.nombre_lugar,
-                    r.ubicacion,
-                    r.barrio,
-                    r.tipo_contaminacion,
-                    r.nivel_afectacion,
-                    r.fecha_reporte
+                    r.id, r.nombre_lugar, r.ubicacion, r.barrio,
+                    r.tipo_contaminacion, r.nivel_afectacion, r.fecha_reporte
                 FROM reportes r
                 WHERE NOT EXISTS (
-                    SELECT 1
-                    FROM jornadas j
-                    WHERE j.reporte_id = r.id
-                    AND j.estado <> 'cancelada'
+                    SELECT 1 FROM jornadas j
+                    WHERE j.reporte_id = r.id AND j.estado <> 'cancelada'
                 )
                 """
             )
 
             for r in cursor.fetchall():
-
-                prioridad = prioridad_desde_nivel(
-                    r["nivel_afectacion"]
-                )
-
+                prioridad = prioridad_desde_nivel(r["nivel_afectacion"])
                 fecha_reporte = a_fecha(r["fecha_reporte"])
 
                 pendientes.append({
@@ -1370,26 +767,18 @@ def jornadas():
                     "prioridad": prioridad,
                     "prioridad_nombre": NOMBRES_PRIORIDAD[prioridad],
                     "fecha_reporte": (
-                        fecha_reporte.isoformat()
-                        if fecha_reporte else ""
+                        fecha_reporte.isoformat() if fecha_reporte else ""
                     )
                 })
 
             # críticos primero; a igual nivel, el reporte más antiguo
-
-            pendientes.sort(
-                key=lambda p: (-p["prioridad"], p["fecha_reporte"])
-            )
+            pendientes.sort(key=lambda p: (-p["prioridad"], p["fecha_reporte"]))
 
     except mysql.connector.Error as error:
-
-        flash(
-            f"No se pudo consultar la base de datos: {error}",
-            "danger"
-        )
+        app.logger.error("Error en jornadas: %s", error)
+        flash("No se pudo consultar la base de datos.", "danger")
 
     finally:
-
         cerrar_conexion(cursor, conexion)
 
     datos = {
@@ -1420,30 +809,14 @@ def jornadas():
 # CREAR JORNADA (solo admin)
 # ============================================================
 
-@app.route(
-    "/crear-jornada",
-    methods=["POST"]
-)
+@app.route("/crear-jornada", methods=["POST"])
 def crear_jornada():
-
     if not usuario_logueado():
-
-        return redirect(
-            url_for("login")
-        )
-
+        return redirect(url_for("login"))
 
     if not es_admin():
-
-        flash(
-            "Solo el administrador puede crear jornadas.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("jornadas")
-        )
-
+        flash("Solo el administrador puede crear jornadas.", "danger")
+        return redirect(url_for("jornadas"))
 
     titulo = request.form.get("titulo", "").strip()
     descripcion = request.form.get("descripcion", "").strip()
@@ -1454,30 +827,13 @@ def crear_jornada():
     fecha = a_fecha(request.form.get("fecha", ""))
     hora = a_hora(request.form.get("hora", ""))
 
-
     if not fecha or not hora:
+        flash("Debes elegir el día y la hora de la jornada.", "danger")
+        return redirect(url_for("jornadas"))
 
-        flash(
-            "Debes elegir el día y la hora de la jornada.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("jornadas")
-        )
-
-
-    if datetime.datetime.combine(fecha, hora) < datetime.datetime.now():
-
-        flash(
-            "No puedes programar una jornada en una fecha que ya pasó.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("jornadas")
-        )
-
+    if datetime.datetime.combine(fecha, hora) < ahora_local():
+        flash("No puedes programar una jornada en una fecha que ya pasó.", "danger")
+        return redirect(url_for("jornadas"))
 
     try:
         cupos = int(request.form.get("cupos", "0"))
@@ -1485,153 +841,78 @@ def crear_jornada():
         cupos = 0
 
     if cupos < 1:
+        flash("Los cupos deben ser al menos 1.", "danger")
+        return redirect(url_for("jornadas"))
 
-        flash(
-            "Los cupos deben ser al menos 1.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("jornadas")
-        )
-
-
-    conexion = None
-    cursor = None
+    conexion = cursor = None
 
     try:
-
         conexion = conectar_bd()
-
-        cursor = conexion.cursor(
-            dictionary=True
-        )
+        cursor = conexion.cursor(dictionary=True)
 
         reporte_id = None
-
         prioridad = prioridad_desde_nivel(nivel_manual)
 
-
-        # si la jornada atiende un reporte, la prioridad
-        # sale del nivel de afectación de ese reporte
-
+        # si la jornada atiende un reporte, la prioridad sale de ese reporte
         if reporte_txt.isdigit():
-
             cursor.execute(
                 """
-                SELECT
-                    id,
-                    nombre_lugar,
-                    barrio,
-                    ubicacion,
-                    nivel_afectacion
+                SELECT id, nombre_lugar, barrio, ubicacion, nivel_afectacion
                 FROM reportes
                 WHERE id = %s
                 """,
                 (int(reporte_txt),)
             )
-
             reporte = cursor.fetchone()
 
             if not reporte:
-
-                flash(
-                    "El reporte seleccionado no existe.",
-                    "danger"
-                )
-
-                return redirect(
-                    url_for("jornadas")
-                )
-
+                flash("El reporte seleccionado no existe.", "danger")
+                return redirect(url_for("jornadas"))
 
             cursor.execute(
                 """
-                SELECT id
-                FROM jornadas
-                WHERE reporte_id = %s
-                AND estado <> 'cancelada'
+                SELECT id FROM jornadas
+                WHERE reporte_id = %s AND estado <> 'cancelada'
                 LIMIT 1
                 """,
                 (reporte["id"],)
             )
 
             if cursor.fetchone():
-
-                flash(
-                    "Ese reporte ya tiene una jornada programada.",
-                    "warning"
-                )
-
-                return redirect(
-                    url_for("jornadas")
-                )
+                flash("Ese reporte ya tiene una jornada programada.", "warning")
+                return redirect(url_for("jornadas"))
 
             reporte_id = reporte["id"]
-
-            prioridad = prioridad_desde_nivel(
-                reporte["nivel_afectacion"]
-            )
+            prioridad = prioridad_desde_nivel(reporte["nivel_afectacion"])
 
             if not lugar:
-
                 lugar = reporte["nombre_lugar"] or ""
-
                 detalle = reporte["barrio"] or reporte["ubicacion"]
-
                 if detalle:
                     lugar = f"{lugar} · {detalle}"
 
-
         if not lugar:
-
-            flash(
-                "Debes indicar el lugar de la jornada.",
-                "danger"
-            )
-
-            return redirect(
-                url_for("jornadas")
-            )
-
+            flash("Debes indicar el lugar de la jornada.", "danger")
+            return redirect(url_for("jornadas"))
 
         if not titulo:
             titulo = f"Jornada de limpieza · {lugar}"
-
 
         cursor.execute(
             """
             INSERT INTO jornadas
             (
-                titulo,
-                descripcion,
-                lugar,
-                fecha,
-                hora,
-                cupos,
-                estado,
-                reporte_id,
-                prioridad
+                titulo, descripcion, lugar, fecha, hora,
+                cupos, estado, reporte_id, prioridad
             )
-            VALUES
-            (
-                %s, %s, %s, %s, %s, %s,
-                'disponible',
-                %s, %s
-            )
+            VALUES (%s, %s, %s, %s, %s, %s, 'disponible', %s, %s)
             """,
             (
-                titulo,
-                descripcion,
-                lugar,
-                fecha.isoformat(),
-                hora.strftime("%H:%M:%S"),
-                cupos,
-                reporte_id,
-                prioridad
+                titulo, descripcion, lugar,
+                fecha.isoformat(), hora.strftime("%H:%M:%S"),
+                cupos, reporte_id, prioridad
             )
         )
-
         conexion.commit()
 
         flash(
@@ -1641,238 +922,118 @@ def crear_jornada():
         )
 
     except mysql.connector.Error as error:
-
         if conexion:
             conexion.rollback()
-
-        flash(
-            f"No se pudo crear la jornada: {error}",
-            "danger"
-        )
+        app.logger.error("Error al crear jornada: %s", error)
+        flash("No se pudo crear la jornada.", "danger")
 
     finally:
-
         cerrar_conexion(cursor, conexion)
 
-
-    return redirect(
-        url_for("jornadas")
-    )
+    return redirect(url_for("jornadas"))
 
 
 # ============================================================
 # CAMBIAR ESTADO DE UNA JORNADA (solo admin)
 # ============================================================
 
-@app.route(
-    "/estado-jornada/<int:id>",
-    methods=["POST"]
-)
+@app.route("/estado-jornada/<int:id>", methods=["POST"])
 def estado_jornada(id):
-
     if not usuario_logueado() or not es_admin():
-
-        flash(
-            "Solo el administrador puede cambiar el estado.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("jornadas")
-        )
-
+        flash("Solo el administrador puede cambiar el estado.", "danger")
+        return redirect(url_for("jornadas"))
 
     estado = request.form.get("estado", "")
 
     if estado not in ESTADOS_JORNADA:
+        flash("Estado no válido.", "danger")
+        return redirect(url_for("jornadas"))
 
-        flash(
-            "Estado no válido.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("jornadas")
-        )
-
-
-    conexion = None
-    cursor = None
+    conexion = cursor = None
 
     try:
-
         conexion = conectar_bd()
-
         cursor = conexion.cursor()
-
         cursor.execute(
-            """
-            UPDATE jornadas
-            SET estado = %s
-            WHERE id = %s
-            """,
-            (estado, id)
+            "UPDATE jornadas SET estado = %s WHERE id = %s", (estado, id)
         )
-
         conexion.commit()
-
-        flash(
-            f"La jornada quedó como {estado}.",
-            "success"
-        )
+        flash(f"La jornada quedó como {estado}.", "success")
 
     except mysql.connector.Error as error:
-
-        flash(
-            f"No se pudo actualizar la jornada: {error}",
-            "danger"
-        )
+        app.logger.error("Error al actualizar jornada: %s", error)
+        flash("No se pudo actualizar la jornada.", "danger")
 
     finally:
-
         cerrar_conexion(cursor, conexion)
 
-
-    return redirect(
-        url_for("jornadas")
-    )
+    return redirect(url_for("jornadas"))
 
 
 # ============================================================
 # ELIMINAR JORNADA (solo admin)
 # ============================================================
 
-@app.route(
-    "/eliminar-jornada/<int:id>",
-    methods=["POST"]
-)
+@app.route("/eliminar-jornada/<int:id>", methods=["POST"])
 def eliminar_jornada(id):
-
     if not usuario_logueado():
-
-        return redirect(
-            url_for("login")
-        )
-
+        return redirect(url_for("login"))
 
     if not es_admin():
+        flash("Solo el administrador puede eliminar jornadas.", "danger")
+        return redirect(url_for("jornadas"))
 
-        flash(
-            "Solo el administrador puede eliminar jornadas.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("jornadas")
-        )
-
-
-    conexion = None
-    cursor = None
+    conexion = cursor = None
 
     try:
-
         conexion = conectar_bd()
-
         cursor = conexion.cursor()
-
         cursor.execute(
-            """
-            DELETE FROM inscripciones_jornada
-            WHERE jornada_id = %s
-            """,
-            (id,)
+            "DELETE FROM inscripciones_jornada WHERE jornada_id = %s", (id,)
         )
-
-        cursor.execute(
-            """
-            DELETE FROM jornadas
-            WHERE id = %s
-            """,
-            (id,)
-        )
-
+        cursor.execute("DELETE FROM jornadas WHERE id = %s", (id,))
         conexion.commit()
-
-        flash(
-            "Jornada eliminada correctamente.",
-            "success"
-        )
+        flash("Jornada eliminada correctamente.", "success")
 
     except mysql.connector.Error as error:
-
-        flash(
-            f"No se pudo eliminar la jornada: {error}",
-            "danger"
-        )
+        app.logger.error("Error al eliminar jornada: %s", error)
+        flash("No se pudo eliminar la jornada.", "danger")
 
     finally:
-
         cerrar_conexion(cursor, conexion)
 
-
-    return redirect(
-        url_for("jornadas")
-    )
+    return redirect(url_for("jornadas"))
 
 
 # ============================================================
 # INSCRIBIRSE A UNA JORNADA (usuario)
 # ============================================================
 
-@app.route(
-    "/inscribirse-jornada/<int:id>",
-    methods=["POST"]
-)
+@app.route("/inscribirse-jornada/<int:id>", methods=["POST"])
 def inscribirse_jornada(id):
-
     if not usuario_logueado():
-
-        flash(
-            "Inicia sesión para inscribirte en una jornada.",
-            "warning"
-        )
-
-        return redirect(
-            url_for("login")
-        )
-
+        flash("Inicia sesión para inscribirte en una jornada.", "warning")
+        return redirect(url_for("login"))
 
     if es_admin():
-
         flash(
-            "El administrador gestiona las jornadas, "
-            "no se inscribe en ellas.",
+            "El administrador gestiona las jornadas, no se inscribe en ellas.",
             "warning"
         )
+        return redirect(url_for("jornadas"))
 
-        return redirect(
-            url_for("jornadas")
-        )
-
-
-    conexion = None
-    cursor = None
+    conexion = cursor = None
 
     try:
-
         conexion = conectar_bd()
-
-        cursor = conexion.cursor(
-            dictionary=True
-        )
+        cursor = conexion.cursor(dictionary=True)
 
         cursor.execute(
             """
             SELECT
-                j.id,
-                j.fecha,
-                j.hora,
-                j.cupos,
-                j.estado,
+                j.id, j.fecha, j.hora, j.cupos, j.estado,
                 (
-                    SELECT COUNT(*)
-                    FROM inscripciones_jornada i
+                    SELECT COUNT(*) FROM inscripciones_jornada i
                     WHERE i.jornada_id = j.id
                 ) AS inscritos
             FROM jornadas j
@@ -1880,135 +1041,76 @@ def inscribirse_jornada(id):
             """,
             (id,)
         )
-
         fila = cursor.fetchone()
 
         jornada = None
 
         if fila:
-
             fila["titulo"] = ""
+            jornada = normalizar_jornada(fila, ahora_local())
 
-            jornada = normalizar_jornada(
-                fila,
-                datetime.datetime.now()
-            )
-
-
-        if not jornada or jornada["estado"] != "disponible" \
-                or jornada["vencida"]:
-
-            flash(
-                "Esa jornada ya no está disponible.",
-                "warning"
-            )
+        if not jornada or jornada["estado"] != "disponible" or jornada["vencida"]:
+            flash("Esa jornada ya no está disponible.", "warning")
 
         elif jornada["libres"] <= 0:
-
-            flash(
-                "Esa jornada ya no tiene cupos.",
-                "warning"
-            )
+            flash("Esa jornada ya no tiene cupos.", "warning")
 
         else:
-
             cursor.execute(
                 """
-                INSERT INTO inscripciones_jornada
-                (jornada_id, usuario_id)
+                INSERT INTO inscripciones_jornada (jornada_id, usuario_id)
                 VALUES (%s, %s)
                 """,
                 (id, session["usuario_id"])
             )
-
             conexion.commit()
-
-            flash(
-                "¡Listo! Quedaste inscrito en la jornada.",
-                "success"
-            )
+            flash("¡Listo! Quedaste inscrito en la jornada.", "success")
 
     except mysql.connector.IntegrityError:
-
-        flash(
-            "Ya estabas inscrito en esta jornada.",
-            "info"
-        )
+        flash("Ya estabas inscrito en esta jornada.", "info")
 
     except mysql.connector.Error as error:
-
-        flash(
-            f"No se pudo completar la inscripción: {error}",
-            "danger"
-        )
+        app.logger.error("Error al inscribirse: %s", error)
+        flash("No se pudo completar la inscripción.", "danger")
 
     finally:
-
         cerrar_conexion(cursor, conexion)
 
-
-    return redirect(
-        url_for("jornadas")
-    )
+    return redirect(url_for("jornadas"))
 
 
 # ============================================================
 # CANCELAR INSCRIPCIÓN (usuario)
 # ============================================================
 
-@app.route(
-    "/cancelar-inscripcion/<int:id>",
-    methods=["POST"]
-)
+@app.route("/cancelar-inscripcion/<int:id>", methods=["POST"])
 def cancelar_inscripcion(id):
-
     if not usuario_logueado():
+        return redirect(url_for("login"))
 
-        return redirect(
-            url_for("login")
-        )
-
-
-    conexion = None
-    cursor = None
+    conexion = cursor = None
 
     try:
-
         conexion = conectar_bd()
-
         cursor = conexion.cursor()
-
         cursor.execute(
             """
             DELETE FROM inscripciones_jornada
-            WHERE jornada_id = %s
-            AND usuario_id = %s
+            WHERE jornada_id = %s AND usuario_id = %s
             """,
             (id, session["usuario_id"])
         )
-
         conexion.commit()
-
-        flash(
-            "Cancelaste tu inscripción.",
-            "success"
-        )
+        flash("Cancelaste tu inscripción.", "success")
 
     except mysql.connector.Error as error:
-
-        flash(
-            f"No se pudo cancelar la inscripción: {error}",
-            "danger"
-        )
+        app.logger.error("Error al cancelar inscripción: %s", error)
+        flash("No se pudo cancelar la inscripción.", "danger")
 
     finally:
-
         cerrar_conexion(cursor, conexion)
 
-
-    return redirect(
-        url_for("jornadas")
-    )
+    return redirect(url_for("jornadas"))
 
 
 # ============================================================
@@ -2017,124 +1119,42 @@ def cancelar_inscripcion(id):
 
 @app.route("/admin")
 def admin():
-
     if not usuario_logueado():
-
-        return redirect(
-            url_for("login")
-        )
-
+        return redirect(url_for("login"))
 
     if not es_admin():
-
-        flash(
-            "No tienes permisos para acceder.",
-            "danger"
-        )
-
-        return redirect(
-            url_for("perfil")
-        )
-
+        flash("No tienes permisos para acceder.", "danger")
+        return redirect(url_for("perfil"))
 
     conexion = conectar_bd()
-
-    cursor = conexion.cursor(
-        dictionary=True
-    )
-
-
-    cursor.execute(
-        """
-        SELECT
-            r.id,
-            r.nombre_lugar,
-            r.ubicacion,
-            r.tipo_contaminacion,
-            r.nivel_afectacion,
-            r.descripcion,
-            r.fotografia,
-            r.fecha_reporte,
-            u.nombre AS usuario_nombre,
-            u.email AS usuario_email
-        FROM reportes r
-        LEFT JOIN usuarios u
-            ON r.usuario_id = u.id
-        ORDER BY r.fecha_reporte DESC
-        """
-    )
-
-
-    reportes = cursor.fetchall()
-
-
-    cursor.execute(
-        """
-        SELECT
-            id,
-            nombre,
-            email,
-            fecha_registro,
-            rol
-        FROM usuarios
-        ORDER BY fecha_registro DESC
-        """
-    )
-
-
-    usuarios = cursor.fetchall()
-
-
-    cerrar_conexion(
-        cursor,
-        conexion
-    )
-
-
-    return render_template(
-        "admin.html",
-        reportes=reportes,
-        usuarios=usuarios
-    )
-
-
-@app.route("/api/reportes-publicos")
-def api_reportes_publicos():
-
-    conexion = conectar_bd()
-
-    cursor = conexion.cursor(
-        dictionary=True
-    )
+    cursor = conexion.cursor(dictionary=True)
 
     cursor.execute("""
         SELECT
-            r.id,
-            r.nombre_lugar,
-            r.ubicacion,
-            r.barrio,
-            r.latitud,
-            r.longitud,
-            r.tipo_contaminacion,
-            r.nivel_afectacion,
-            r.descripcion,
-            r.fotografia,
-            r.fecha_reporte,
-            u.nombre AS usuario_nombre
+            r.id, r.nombre_lugar, r.ubicacion, r.tipo_contaminacion,
+            r.nivel_afectacion, r.descripcion, r.fotografia,
+            r.fecha_reporte, u.nombre AS usuario_nombre,
+            u.email AS usuario_email
         FROM reportes r
-        LEFT JOIN usuarios u
-            ON r.usuario_id = u.id
-        WHERE r.latitud IS NOT NULL
-        AND r.longitud IS NOT NULL
+        LEFT JOIN usuarios u ON r.usuario_id = u.id
         ORDER BY r.fecha_reporte DESC
     """)
+    lista_reportes = cursor.fetchall()
 
-    reportes = cursor.fetchall()
+    cursor.execute("""
+        SELECT id, nombre, email, fecha_registro, rol
+        FROM usuarios
+        ORDER BY fecha_registro DESC
+    """)
+    lista_usuarios = cursor.fetchall()
 
-    cursor.close()
-    conexion.close()
+    cerrar_conexion(cursor, conexion)
 
-    return jsonify(reportes)
+    return render_template(
+        "admin.html", reportes=lista_reportes, usuarios=lista_usuarios
+    )
+
+
 # ============================================================
 # PREPARAR TABLAS DE JORNADAS
 # ============================================================
@@ -2143,13 +1163,8 @@ preparar_tablas()
 
 
 # ============================================================
-# INICIAR APLICACIÓN
+# INICIAR APLICACIÓN (solo local; en Render lo ejecuta gunicorn)
 # ============================================================
 
 if __name__ == "__main__":
-
-    app.run(
-        debug=True,
-        host="127.0.0.1",
-        port=5000
-    )
+    app.run(debug=True, host="127.0.0.1", port=5000)
