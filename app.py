@@ -224,7 +224,7 @@ def iniciar_sesion():
     cursor = conexion.cursor(dictionary=True)
     cursor.execute(
         """
-        SELECT id, nombre, correo, contraseña, rol
+        SELECT id, nombre, correo, contrasena, rol
         FROM usuarios
         WHERE email = %s
         """,
@@ -344,6 +344,7 @@ def crear_reporte():
 
     conexion = conectar_bd()
     cursor = conexion.cursor()
+    titulo = nombre_lugar
 
     cursor.execute(
         """
