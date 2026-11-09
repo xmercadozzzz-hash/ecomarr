@@ -1,0 +1,1196 @@
+
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>ECOMAR | Vida submarina</title>
+
+
+    <!-- Bootstrap -->
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+
+    <!-- Bootstrap Icons -->
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    >
+
+
+    <!-- Estilos principales -->
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+
+
+    <style>
+
+        /* =====================================================
+           TORTUGA ANIMADA
+        ===================================================== */
+
+        .hero {
+            position: relative;
+            overflow: hidden;
+        }
+
+
+        .tortuga-fondo {
+            position: absolute;
+
+            /* posición horizontal: menor % = más a la izquierda */
+            left: 38%;
+            top: 50%;
+
+            width: 560px;
+            max-width: 48%;
+
+            /* detrás del texto y de la tarjeta */
+            z-index: 1;
+
+            opacity: 0.9;
+
+            pointer-events: none;
+
+            transform: translate(-50%, -50%);
+
+            animation: nadarTortuga 16s ease-in-out infinite;
+        }
+
+
+        @keyframes nadarTortuga {
+
+            0% {
+                transform: translate(-50%, -50%) rotate(0deg);
+            }
+
+            25% {
+                transform: translate(calc(-50% - 45px), calc(-50% + 14px)) rotate(-2deg);
+            }
+
+            50% {
+                transform: translate(calc(-50% - 90px), -50%) rotate(2deg);
+            }
+
+            75% {
+                transform: translate(calc(-50% - 45px), calc(-50% - 12px)) rotate(-1deg);
+            }
+
+            100% {
+                transform: translate(-50%, -50%) rotate(0deg);
+            }
+
+        }
+
+
+        /* =====================================================
+           REPORTES RECIENTES
+        ===================================================== */
+
+        .reportes-section {
+            padding: 70px 0;
+        }
+
+
+        .reportes-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            margin-bottom: 30px;
+        }
+
+
+        .reportes-header h2 {
+            margin: 5px 0 0;
+            font-size: 38px;
+            font-weight: 700;
+            color: #173b56;
+        }
+
+
+        .reportes-header a {
+            color: #0784b5;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+
+        .reportes-header a:hover {
+            color: #056d94;
+        }
+
+
+        .reportes-tag {
+            color: #079b65;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+
+        /* =====================================================
+           TARJETA DE REPORTE
+        ===================================================== */
+
+        .reporte-card {
+            position: relative;
+
+            height: 390px;
+
+            overflow: hidden;
+
+            border-radius: 20px;
+
+            background: #e9eef1;
+
+            box-shadow:
+                0 8px 25px rgba(0, 0, 0, 0.10);
+
+            transition:
+                transform 0.25s ease,
+                box-shadow 0.25s ease;
+        }
+
+
+        .reporte-card:hover {
+            transform: translateY(-5px);
+
+            box-shadow:
+                0 15px 35px rgba(0, 0, 0, 0.16);
+        }
+
+
+        /* =====================================================
+           IMAGEN DEL REPORTE
+        ===================================================== */
+
+        .reporte-card img {
+            width: 100%;
+
+            height: 100%;
+
+            display: block;
+
+            object-fit: cover;
+        }
+
+
+        .reporte-sin-imagen {
+            width: 100%;
+
+            height: 100%;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            background: #dfe7ea;
+
+            color: #68777e;
+
+            font-size: 15px;
+        }
+
+
+        /* =====================================================
+           CAPA SOBRE LA IMAGEN
+        ===================================================== */
+
+        .reporte-overlay {
+            position: absolute;
+
+            inset: 0;
+
+            display: flex;
+
+            flex-direction: column;
+
+            justify-content: space-between;
+
+            padding: 22px;
+
+            color: white;
+
+            background:
+                linear-gradient(
+                    to bottom,
+                    rgba(0, 0, 0, 0.10) 0%,
+                    rgba(0, 0, 0, 0.05) 30%,
+                    rgba(0, 0, 0, 0.86) 100%
+                );
+        }
+
+
+        /* =====================================================
+           ESTADO
+        ===================================================== */
+
+        .reporte-estado {
+            align-self: flex-start;
+
+            padding: 6px 14px;
+
+            border-radius: 20px;
+
+            background:
+                rgba(255, 255, 255, 0.95);
+
+            color: #079b65;
+
+            font-size: 13px;
+
+            font-weight: 700;
+        }
+
+
+        /* =====================================================
+           INFORMACIÓN
+        ===================================================== */
+
+        .reporte-info h3 {
+            margin: 0 0 8px;
+
+            color: white;
+
+            font-size: 25px;
+
+            font-weight: 700;
+
+            line-height: 1.15;
+        }
+
+
+        .reporte-info .reportado-por {
+            margin: 0 0 4px;
+
+            color:
+                rgba(255, 255, 255, 0.95);
+
+            font-size: 14px;
+        }
+
+
+        .reporte-info .direccion {
+            margin: 0 0 12px;
+
+            color:
+                rgba(255, 255, 255, 0.85);
+
+            font-size: 14px;
+
+            white-space: nowrap;
+
+            overflow: hidden;
+
+            text-overflow: ellipsis;
+        }
+
+
+        /* =====================================================
+           DETALLES
+        ===================================================== */
+
+        .reporte-detalles {
+            display: flex;
+
+            align-items: center;
+
+            gap: 8px;
+
+            flex-wrap: wrap;
+        }
+
+
+        .reporte-tipo {
+            max-width: 65%;
+
+            padding: 5px 10px;
+
+            border-radius: 14px;
+
+            background:
+                rgba(255, 255, 255, 0.16);
+
+            color: white;
+
+            font-size: 12px;
+
+            white-space: nowrap;
+
+            overflow: hidden;
+
+            text-overflow: ellipsis;
+        }
+
+
+        /* =====================================================
+           NIVELES
+        ===================================================== */
+
+        .nivel {
+            padding: 5px 11px;
+
+            border-radius: 14px;
+
+            font-size: 12px;
+
+            font-weight: 700;
+        }
+
+
+        .nivel-critico {
+            background: #dc3545;
+
+            color: white;
+        }
+
+
+        .nivel-alto {
+            background: #fd7e14;
+
+            color: white;
+        }
+
+
+        .nivel-medio {
+            background: #ffc107;
+
+            color: #212529;
+        }
+
+
+        .nivel-bajo {
+            background: #198754;
+
+            color: white;
+        }
+
+
+        .nivel-default {
+            background: #6c757d;
+
+            color: white;
+        }
+
+
+        /* =====================================================
+           SIN REPORTES
+        ===================================================== */
+
+        .sin-reportes {
+            padding: 60px 20px;
+
+            text-align: center;
+
+            border-radius: 20px;
+
+            background: #f5f8f9;
+        }
+
+
+        .sin-reportes h3 {
+            margin-bottom: 8px;
+
+            color: #173b56;
+        }
+
+
+        .sin-reportes p {
+            margin-bottom: 20px;
+
+            color: #6c757d;
+        }
+
+
+        /* =====================================================
+           RESPONSIVE
+        ===================================================== */
+
+        @media (max-width: 992px) {
+
+            .tortuga-fondo {
+                width: 420px;
+
+                max-width: 50%;
+            }
+
+        }
+
+
+        @media (max-width: 768px) {
+
+            .reportes-section {
+                padding: 50px 0;
+            }
+
+
+            .reportes-header {
+                align-items: flex-start;
+
+                flex-direction: column;
+
+                gap: 12px;
+            }
+
+
+            .reportes-header h2 {
+                font-size: 30px;
+            }
+
+
+            .reporte-card {
+                height: 360px;
+            }
+
+
+            .reporte-info h3 {
+                font-size: 22px;
+            }
+
+
+            .tortuga-fondo {
+                left: 50%;
+
+                width: 300px;
+
+                max-width: 60%;
+
+                opacity: 0.6;
+            }
+
+        }
+
+
+        @media (max-width: 576px) {
+
+            .tortuga-fondo {
+                width: 240px;
+
+                max-width: 65%;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+    <!-- =====================================================
+         NAVBAR
+    ===================================================== -->
+
+    {% include 'components/navbar.html' %}
+
+
+    <!-- =====================================================
+         CONTENIDO PRINCIPAL
+    ===================================================== -->
+
+    <main>
+
+
+        <!-- =================================================
+             HERO
+        ================================================== -->
+
+        <section class="hero">
+
+
+            <!-- TORTUGA ANIMADA -->
+
+            <img
+                src="{{ url_for('static', filename='img/tortuga.png') }}"
+                class="tortuga-fondo"
+                alt=""
+            >
+
+
+            <!-- CAPA DEL HERO -->
+
+            <div class="hero-overlay"></div>
+
+
+            <div class="container hero-content">
+
+
+                <div class="row align-items-center">
+
+
+                    <!-- TEXTO -->
+
+                    <div class="col-lg-7">
+
+                        <span class="hero-badge">
+                            ODS 14 · Vida submarina
+                        </span>
+
+
+                        <h1>
+                            Protejamos nuestros
+                            <span>océanos</span>
+                        </h1>
+
+
+                        <p class="hero-description">
+
+                            Identifica lugares afectados por la
+                            contaminación, comparte información
+                            y participa en acciones comunitarias
+                            para proteger nuestros ecosistemas
+                            acuáticos.
+
+                        </p>
+
+
+                        <div class="hero-buttons">
+
+
+                            <a
+                                href="{{ url_for('reportar') }}"
+                                class="btn btn-ecomar-primary"
+                            >
+                                Reportar contaminación
+                            </a>
+
+
+                            <a
+                                href="{{ url_for('reportes') }}"
+                                class="btn btn-ecomar-outline"
+                            >
+                                Explorar zonas
+                            </a>
+
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- TARJETA HERO -->
+
+                    <div class="col-lg-5 d-none d-lg-block">
+
+
+                        <div class="hero-card">
+
+
+                            <div class="hero-card-icon">
+
+                                <i class="bi bi-water"></i>
+
+                            </div>
+
+
+                            <h3>
+
+                                El océano necesita
+                                nuestra participación
+
+                            </h3>
+
+
+                            <p>
+
+                                Una comunidad informada puede
+                                identificar y ayudar a recuperar
+                                espacios afectados por la
+                                contaminación.
+
+                            </p>
+
+
+                            <div class="hero-card-line"></div>
+
+
+                            <span>
+
+                                Comunidad + Tecnología + Acción
+
+                            </span>
+
+
+                        </div>
+
+
+                    </div>
+
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+        <!-- =================================================
+             ACCIONES
+        ================================================== -->
+
+        <section class="acciones">
+
+
+            <div class="container">
+
+
+                <div class="section-heading">
+
+
+                    <span class="section-tag">
+
+                        ¿Qué quieres hacer?
+
+                    </span>
+
+
+                    <h2>
+
+                        Participa en el cuidado
+                        de nuestros ecosistemas
+
+                    </h2>
+
+
+                    <p>
+
+                        EcoMar Engineer conecta la identificación
+                        de problemáticas ambientales con
+                        oportunidades de participación comunitaria.
+
+                    </p>
+
+
+                </div>
+
+
+                <div class="row g-4">
+
+
+                    <!-- EXPLORAR -->
+
+                    <div class="col-md-6 col-lg-4">
+
+
+                        <a
+                            href="{{ url_for('reportes') }}"
+                            class="action-card"
+                        >
+
+
+                            <div class="action-icon blue">
+
+                                <i class="bi bi-map"></i>
+
+                            </div>
+
+
+                            <h3>
+
+                                Explorar zonas
+
+                            </h3>
+
+
+                            <p>
+
+                                Consulta lugares afectados por la
+                                contaminación registrados por la comunidad.
+
+                            </p>
+
+
+                            <span class="action-link">
+
+                                Explorar
+
+                            </span>
+
+
+                        </a>
+
+
+                    </div>
+
+
+                    <!-- REPORTAR -->
+
+                    <div class="col-md-6 col-lg-4">
+
+
+                        <a
+                            href="{{ url_for('reportar') }}"
+                            class="action-card featured"
+                        >
+
+
+                            <div class="action-icon green">
+
+                                <i class="bi bi-camera"></i>
+
+                            </div>
+
+
+                            <h3>
+
+                                Reportar contaminación
+
+                            </h3>
+
+
+                            <p>
+
+                                Registra un lugar afectado incluyendo
+                                ubicación, descripción y fotografía.
+
+                            </p>
+
+
+                            <span class="action-link">
+
+                                Crear reporte
+
+                            </span>
+
+
+                        </a>
+
+
+                    </div>
+
+
+                    <!-- JORNADAS -->
+
+                    <div class="col-md-6 col-lg-4">
+
+
+                        <a
+                            href="{{ url_for('jornadas') }}"
+                            class="action-card"
+                        >
+
+
+                            <div class="action-icon turquoise">
+
+                                <i class="bi bi-people"></i>
+
+                            </div>
+
+
+                            <h3>
+
+                                Jornadas
+
+                            </h3>
+
+
+                            <p>
+
+                                Encuentra actividades de limpieza
+                                y conservación.
+
+                            </p>
+
+
+                            <span class="action-link">
+
+                                Ver jornadas
+
+                            </span>
+
+
+                        </a>
+
+
+                    </div>
+
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+        <!-- =================================================
+             REPORTES RECIENTES
+        ================================================== -->
+
+        <section class="reportes-section">
+
+
+            <div class="container">
+
+
+                <!-- CABECERA -->
+
+                <div class="reportes-header">
+
+
+                    <div>
+
+
+                        <span class="reportes-tag">
+
+                            Actividad de la comunidad
+
+                        </span>
+
+
+                        <h2>
+
+                            Reportes recientes
+
+                        </h2>
+
+
+                    </div>
+
+
+                    <a href="{{ url_for('reportes') }}">
+
+                        Ver todos →
+
+                    </a>
+
+
+                </div>
+
+
+                <!-- TARJETAS -->
+
+                <div class="row g-4">
+
+
+                    {% if reportes_recientes %}
+
+
+                        {% for reporte in reportes_recientes %}
+
+
+                            <div class="col-lg-4 col-md-6">
+
+
+                                <div class="reporte-card">
+
+
+                                    <!-- IMAGEN -->
+
+                                    {% if reporte.fotografia %}
+
+
+                                        <img
+                                            src="{{ url_for(
+                                                'static',
+                                                filename='uploads/' ~ reporte.fotografia
+                                            ) }}"
+                                            alt="{{ reporte.nombre_lugar or 'Zona reportada' }}"
+                                        >
+
+
+                                    {% else %}
+
+
+                                        <div class="reporte-sin-imagen">
+
+                                            Sin fotografía
+
+                                        </div>
+
+
+                                    {% endif %}
+
+
+                                    <!-- INFORMACIÓN SOBRE LA IMAGEN -->
+
+                                    <div class="reporte-overlay">
+
+
+                                        <!-- ESTADO -->
+
+                                        <span class="reporte-estado">
+
+                                            Reportado
+
+                                        </span>
+
+
+                                        <!-- INFORMACIÓN -->
+
+                                        <div class="reporte-info">
+
+
+                                            <!-- ZONA -->
+
+                                            <h3>
+
+                                                {{ reporte.nombre_lugar or "Zona reportada" }}
+
+                                            </h3>
+
+
+                                            <!-- USUARIO -->
+
+                                            <p class="reportado-por">
+
+                                                {{ reporte.usuario_nombre or "Usuario" }}
+
+                                            </p>
+
+
+                                            <!-- DIRECCIÓN -->
+
+                                            <p class="direccion">
+
+                                                {{ reporte.ubicacion or "Dirección no registrada" }}
+
+                                            </p>
+
+
+                                            <!-- TIPO Y NIVEL -->
+
+                                            <div class="reporte-detalles">
+
+
+                                                <span class="reporte-tipo">
+
+                                                    {{ reporte.tipo_contaminacion or "Contaminación no registrada" }}
+
+                                                </span>
+
+
+                                                {% if reporte.nivel_afectacion == "Crítico" %}
+
+
+                                                    <span class="nivel nivel-critico">
+
+                                                        Crítico
+
+                                                    </span>
+
+
+                                                {% elif reporte.nivel_afectacion == "Alto" %}
+
+
+                                                    <span class="nivel nivel-alto">
+
+                                                        Alto
+
+                                                    </span>
+
+
+                                                {% elif reporte.nivel_afectacion == "Medio" %}
+
+
+                                                    <span class="nivel nivel-medio">
+
+                                                        Medio
+
+                                                    </span>
+
+
+                                                {% elif reporte.nivel_afectacion == "Bajo" %}
+
+
+                                                    <span class="nivel nivel-bajo">
+
+                                                        Bajo
+
+                                                    </span>
+
+
+                                                {% elif reporte.nivel_afectacion %}
+
+
+                                                    <span class="nivel nivel-default">
+
+                                                        {{ reporte.nivel_afectacion }}
+
+                                                    </span>
+
+
+                                                {% endif %}
+
+
+                                            </div>
+
+
+                                        </div>
+
+
+                                    </div>
+
+
+                                </div>
+
+
+                            </div>
+
+
+                        {% endfor %}
+
+
+                    {% else %}
+
+
+                        <!-- SIN REPORTES -->
+
+                        <div class="col-12">
+
+
+                            <div class="sin-reportes">
+
+
+                                <h3>
+
+                                    Aún no hay reportes
+
+                                </h3>
+
+
+                                <p>
+
+                                    Sé el primero en reportar
+                                    una zona afectada.
+
+                                </p>
+
+
+                                <a
+                                    href="{{ url_for('reportar') }}"
+                                    class="btn btn-primary"
+                                >
+
+                                    Crear reporte
+
+                                </a>
+
+
+                            </div>
+
+
+                        </div>
+
+
+                    {% endif %}
+
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+        <!-- =================================================
+             LLAMADO A LA ACCIÓN
+        ================================================== -->
+
+        <section class="cta">
+
+
+            <div class="container">
+
+
+                <div class="cta-content">
+
+
+                    <div>
+
+
+                        <span class="section-tag light">
+
+                            Tu participación importa
+
+                        </span>
+
+
+                        <h2>
+
+                            Un reporte puede ser
+                            el comienzo de un cambio.
+
+                        </h2>
+
+
+                        <p>
+
+                            Ayúdanos a visibilizar los lugares
+                            que necesitan atención.
+
+                        </p>
+
+
+                    </div>
+
+
+                    <a
+                        href="{{ url_for('reportar') }}"
+                        class="btn btn-cta"
+                    >
+
+                        Reportar un lugar
+
+                    </a>
+
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+    </main>
+
+
+    <!-- =====================================================
+         FOOTER
+    ====================================================== -->
+
+    {% include 'components/footer.html' %}
+
+
+    <!-- Bootstrap JS -->
+
+    <script
+        src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    ></script>
+
+
+    <!-- JS ECOMAR -->
+
+    <script
+        src="{{ url_for('static', filename='js/app.js') }}"
+    ></script>
+
+
+</body>
+
+</html>

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Reportar | ECOMAR</title>
+
+<link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+>
+
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+>
+
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+>
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/style.css') }}"
+>
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/reportar.css') }}"
+>
+
+
+</head>
+
+<body>
+
+
+{% include 'components/navbar.html' %}
+
+<main class="container py-5">
+
+    <div class="row justify-content-center">
+
+        <div class="col-lg-8">
+
+            <div class="card reporte-card border-0 shadow-sm rounded-4">
+
+                <div class="card-body p-4 p-md-5">
+
+                    <div class="text-center mb-4">
+
+                        <div class="mb-3">
+                            <i class="bi bi-exclamation-triangle-fill icono-reporte"></i>
+                        </div>
+
+                        <h1 class="fw-bold">
+                            Reportar contaminación
+                        </h1>
+
+                        <p class="text-muted">
+                            Selecciona en el mapa la zona afectada
+                            y completa la información del reporte.
+                        </p>
+
+                    </div>
+
+                    <!-- IMPORTANTE:
+                         La ruta correcta en app.py es crear_reporte
+                    -->
+                    <form
+                        action="{{ url_for('crear_reporte') }}"
+                        method="POST"
+                        enctype="multipart/form-data"
+                        id="formulario-reporte"
+                    >
+
+                        <div class="mb-3">
+
+                            <label
+                                for="nombre_lugar"
+                                class="form-label fw-semibold"
+                            >
+                                Nombre del lugar
+                            </label>
+
+                            <input
+                                type="text"
+                                name="nombre_lugar"
+                                id="nombre_lugar"
+                                class="form-control"
+                                placeholder="Ej. Río Sinú"
+                                required
+                            >
+
+                        </div>
+
+                        <div class="mb-4">
+
+                            <label class="form-label fw-semibold">
+                                Selecciona la zona afectada
+                            </label>
+
+                            <p class="text-muted small mb-2">
+                                Haz clic sobre el lugar afectado.
+                                El marcador aparecerá automáticamente.
+                                También puedes moverlo para ajustar
+                                la ubicación.
+                            </p>
+
+                            <div
+                                id="map"
+                                style="
+                                    width: 100%;
+                                    height: 400px;
+                                    border-radius: 12px;
+                                    overflow: hidden;
+                                "
+                            ></div>
+
+                            <div class="form-text mt-2">
+                                <i class="bi bi-info-circle"></i>
+                                Haz clic en el mapa para seleccionar
+                                la ubicación del reporte.
+                            </div>
+
+                        </div>
+
+                        <div class="mb-3">
+
+                            <label
+                                for="ubicacion"
+                                class="form-label fw-semibold"
+                            >
+                                Dirección detectada
+                            </label>
+
+                            <input
+                                type="text"
+                                name="ubicacion"
+                                id="ubicacion"
+                                class="form-control"
+                                placeholder="Selecciona primero un punto en el mapa"
+                                readonly
+                                required
+                            >
+
+                        </div>
+
+                        <div class="mb-3">
+
+                            <label
+                                for="barrio"
+                                class="form-label fw-semibold"
+                            >
+                                Barrio o sector
+                            </label>
+
+                            <input
+                                type="text"
+                                name="barrio"
+                                id="barrio"
+                                class="form-control"
+                                placeholder="Se detectará automáticamente"
+                                readonly
+                            >
+
+                        </div>
+
+                        <div class="row mb-4">
+
+                            <div class="col-md-6 mb-3 mb-md-0">
+
+                                <label
+                                    for="latitud"
+                                    class="form-label fw-semibold"
+                                >
+                                    <i class="bi bi-geo-alt"></i>
+                                    Latitud
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="latitud"
+                                    id="latitud"
+                                    class="form-control"
+                                    placeholder="Selecciona un punto"
+                                    readonly
+                                    required
+                                >
+
+                            </div>
+
+                            <div class="col-md-6">
+
+                                <label
+                                    for="longitud"
+                                    class="form-label fw-semibold"
+                                >
+                                    <i class="bi bi-geo-alt"></i>
+                                    Longitud
+                                </label>
+
+                                <input
+                                    type="text"
+                                    name="longitud"
+                                    id="longitud"
+                                    class="form-control"
+                                    placeholder="Selecciona un punto"
+                                    readonly
+                                    required
+                                >
+
+                            </div>
+
+                        </div>
+
+                        <div class="mb-3">
+
+                            <label
+                                for="tipo_contaminacion"
+                                class="form-label fw-semibold"
+                            >
+                                Tipo de contaminación
+                            </label>
+
+                            <select
+                                name="tipo_contaminacion"
+                                id="tipo_contaminacion"
+                                class="form-select"
+                                required
+                            >
+
+                                <option value="">
+                                    Selecciona una opción
+                                </option>
+
+                                <option value="Residuos plásticos">
+                                    Residuos plásticos
+                                </option>
+
+                                <option value="Contaminación del agua">
+                                    Contaminación del agua
+                                </option>
+
+                                <option value="Derrames">
+                                    Derrames
+                                </option>
+
+                                <option value="Residuos sólidos">
+                                    Residuos sólidos
+                                </option>
+
+                            </select>
+
+                        </div>
+
+                        <div class="mb-3">
+
+                            <label
+                                for="nivel_afectacion"
+                                class="form-label fw-semibold"
+                            >
+                                Nivel de afectación
+                            </label>
+
+                            <select
+                                name="nivel_afectacion"
+                                id="nivel_afectacion"
+                                class="form-select"
+                                required
+                            >
+
+                                <option value="">
+                                    Selecciona una opción
+                                </option>
+
+                                <option value="Bajo">
+                                    Bajo
+                                </option>
+
+                                <option value="Medio">
+                                    Medio
+                                </option>
+
+                                <option value="Alto">
+                                    Alto
+                                </option>
+
+                                <option value="Crítico">
+                                    Crítico
+                                </option>
+
+                            </select>
+
+                        </div>
+
+                        <div class="mb-3">
+
+                            <label
+                                for="descripcion"
+                                class="form-label fw-semibold"
+                            >
+                                Descripción
+                            </label>
+
+                            <textarea
+                                name="descripcion"
+                                id="descripcion"
+                                class="form-control"
+                                rows="5"
+                                placeholder="Describe qué observaste en el lugar..."
+                                required
+                            ></textarea>
+
+                        </div>
+
+                        <div class="mb-4">
+
+                            <label
+                                for="fotografia"
+                                class="form-label fw-semibold"
+                            >
+                                Fotografía
+                            </label>
+
+                            <input
+                                type="file"
+                                name="fotografia"
+                                id="fotografia"
+                                class="form-control"
+                                accept="image/*"
+                            >
+
+                            <div class="form-text">
+                                Puedes adjuntar una fotografía
+                                como evidencia del lugar reportado.
+                            </div>
+
+                        </div>
+
+                        <div class="d-flex gap-2">
+
+                            <a
+                                href="{{ url_for('inicio') }}"
+                                class="btn btn-light w-50"
+                            >
+                                <i class="bi bi-x-circle"></i>
+                                Cancelar
+                            </a>
+
+                            <button
+                                type="submit"
+                                class="btn btn-primary w-50"
+                            >
+                                <i class="bi bi-send"></i>
+                                Publicar reporte
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</main>
+
+{% include 'components/footer.html' %}
+
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+></script>
+
+<script
+    src="{{ url_for('static', filename='js/geolocalizacion.js') }}"
+></script>
+
+<script
+    src="{{ url_for('static', filename='js/mapa-selector.js') }}"
+></script>
+
+<script
+    src="{{ url_for('static', filename='js/reportar.js') }}"
+></script>
+
+<script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+></script>
+```
+
+</body>
+
+</html>

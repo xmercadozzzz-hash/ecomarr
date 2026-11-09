@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+
+<meta charset="UTF-8">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
+
+<title>Administración | ECOMAR</title>
+
+<link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+>
+
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+>
+
+<!-- LEAFLET -->
+<link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+>
+
+<link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/style.css') }}"
+>
+
+
+</head>
+
+<body>
+
+{% include 'components/navbar.html' %}
+
+<main class="container py-5">
+
+    <!-- ==================================================
+         ENCABEZADO
+    =================================================== -->
+
+    <div class="d-flex justify-content-between align-items-center mb-5">
+
+        <div>
+
+            <span class="text-primary fw-semibold">
+
+                <i class="bi bi-shield-check"></i>
+
+                Administración
+
+            </span>
+
+            <h1 class="fw-bold mt-2">
+
+                Panel de administrador
+
+            </h1>
+
+            <p class="text-muted mb-0">
+
+                Gestiona los reportes y las jornadas
+                ambientales de ECOMAR.
+
+            </p>
+
+        </div>
+
+        <div class="text-end">
+
+            <span class="badge bg-success px-3 py-2">
+
+                <i class="bi bi-person-check"></i>
+
+                Administrador
+
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <!-- ==================================================
+         TARJETAS
+    =================================================== -->
+
+    <div class="row g-4 mb-5">
+
+        <!-- REPORTES -->
+
+        <div class="col-md-4">
+
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+
+                <div class="card-body p-4">
+
+                    <div class="d-flex justify-content-between">
+
+                        <div>
+
+                            <p class="text-muted mb-1">
+
+                                Reportes
+
+                            </p>
+
+                            <h2 class="fw-bold">
+
+                                <i
+                                    class="bi bi-exclamation-triangle text-warning"
+                                ></i>
+
+                            </h2>
+
+                        </div>
+
+                        <div>
+
+                            <i
+                                class="bi bi-file-earmark-text fs-1 text-primary"
+                            ></i>
+
+                        </div>
+
+                    </div>
+
+                    <p class="text-muted mb-0">
+
+                        Consulta los reportes realizados
+                        por la comunidad.
+
+                    </p>
+
+                    <a
+                        href="{{ url_for('reportes') }}"
+                        class="btn btn-outline-primary mt-3"
+                    >
+
+                        Ver reportes
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- JORNADAS -->
+
+        <div class="col-md-4">
+
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+
+                <div class="card-body p-4">
+
+                    <div class="d-flex justify-content-between">
+
+                        <div>
+
+                            <p class="text-muted mb-1">
+
+                                Jornadas
+
+                            </p>
+
+                            <h2 class="fw-bold">
+
+                                <i
+                                    class="bi bi-calendar-event text-success"
+                                ></i>
+
+                            </h2>
+
+                        </div>
+
+                        <div>
+
+                            <i
+                                class="bi bi-people fs-1 text-success"
+                            ></i>
+
+                        </div>
+
+                    </div>
+
+                    <p class="text-muted mb-0">
+
+                        Programa actividades para ayudar
+                        a recuperar zonas afectadas.
+
+                    </p>
+
+                    <a
+                        href="{{ url_for('jornadas') }}"
+                        class="btn btn-outline-success mt-3"
+                    >
+
+                        Gestionar jornadas
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- MAPA -->
+
+        <div class="col-md-4">
+
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+
+                <div class="card-body p-4">
+
+                    <div class="d-flex justify-content-between">
+
+                        <div>
+
+                            <p class="text-muted mb-1">
+
+                                Mapa
+
+                            </p>
+
+                            <h2 class="fw-bold">
+
+                                <i
+                                    class="bi bi-map text-info"
+                                ></i>
+
+                            </h2>
+
+                        </div>
+
+                        <div>
+
+                            <i
+                                class="bi bi-geo-alt fs-1 text-info"
+                            ></i>
+
+                        </div>
+
+                    </div>
+
+                    <p class="text-muted mb-0">
+
+                        Consulta las zonas afectadas
+                        reportadas por los usuarios.
+
+                    </p>
+
+                    <a
+                        href="#mapa-admin"
+                        class="btn btn-outline-info mt-3"
+                    >
+
+                        Ver mapa
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ==================================================
+         MAPA DE REPORTES
+    =================================================== -->
+
+    <div class="card border-0 shadow-sm rounded-4 mb-5">
+
+        <div class="card-body p-4 p-md-5">
+
+            <div
+                class="d-flex justify-content-between align-items-center mb-4"
+            >
+
+                <div>
+
+                    <h3 class="fw-bold mb-1">
+
+                        <i class="bi bi-map text-info"></i>
+
+                        Mapa de reportes
+
+                    </h3>
+
+                    <p class="text-muted mb-0">
+
+                        Consulta las zonas reportadas
+                        por todos los usuarios.
+
+                    </p>
+
+                </div>
+
+                <span
+                    class="badge bg-info"
+                    id="contador-reportes-admin"
+                >
+
+                    Cargando...
+
+                </span>
+
+            </div>
+
+
+            <div
+                id="mapa-admin"
+                style="
+                    width: 100%;
+                    height: 500px;
+                    border-radius: 16px;
+                    overflow: hidden;
+                "
+            ></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ==================================================
+         GESTIÓN DE JORNADAS
+    =================================================== -->
+
+    <div class="card border-0 shadow-sm rounded-4">
+
+        <div class="card-body p-4 p-md-5">
+
+            <div
+                class="d-flex justify-content-between align-items-center mb-4"
+            >
+
+                <div>
+
+                    <h3 class="fw-bold mb-1">
+
+                        <i
+                            class="bi bi-calendar-plus text-success"
+                        ></i>
+
+                        Gestión de jornadas
+
+                    </h3>
+
+                    <p class="text-muted mb-0">
+
+                        Programa actividades ambientales
+                        para la comunidad.
+
+                    </p>
+
+                </div>
+
+                <a
+                    href="{{ url_for('jornadas') }}"
+                    class="btn btn-success"
+                >
+
+                    <i class="bi bi-plus-circle"></i>
+
+                    Crear jornada
+
+                </a>
+
+            </div>
+
+
+            <!-- INFORMACIÓN -->
+
+            <div class="alert alert-info rounded-4">
+
+                <i class="bi bi-info-circle"></i>
+
+                <strong>
+                    ¿Cómo funcionan las jornadas?
+                </strong>
+
+                <br>
+
+                El administrador puede establecer el lugar,
+                fecha, horario, descripción y número de participantes.
+                Los usuarios podrán consultar las jornadas
+                disponibles e inscribirse para ayudar.
+
+            </div>
+
+
+            <!-- FLUJO -->
+
+            <div class="row g-4 mt-2">
+
+                <div class="col-md-3">
+
+                    <div class="text-center">
+
+                        <i
+                            class="bi bi-exclamation-circle fs-1 text-warning"
+                        ></i>
+
+                        <h6 class="fw-bold mt-3">
+
+                            1. Reporte
+
+                        </h6>
+
+                        <p class="small text-muted">
+
+                            Un usuario reporta una afectación.
+
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="col-md-3">
+
+                    <div class="text-center">
+
+                        <i
+                            class="bi bi-person-gear fs-1 text-primary"
+                        ></i>
+
+                        <h6 class="fw-bold mt-3">
+
+                            2. Revisión
+
+                        </h6>
+
+                        <p class="small text-muted">
+
+                            El administrador revisa el reporte.
+
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="col-md-3">
+
+                    <div class="text-center">
+
+                        <i
+                            class="bi bi-calendar-plus fs-1 text-success"
+                        ></i>
+
+                        <h6 class="fw-bold mt-3">
+
+                            3. Jornada
+
+                        </h6>
+
+                        <p class="small text-muted">
+
+                            Se programa una jornada de ayuda.
+
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="col-md-3">
+
+                    <div class="text-center">
+
+                        <i
+                            class="bi bi-people fs-1 text-info"
+                        ></i>
+
+                        <h6 class="fw-bold mt-3">
+
+                            4. Comunidad
+
+                        </h6>
+
+                        <p class="small text-muted">
+
+                            Los usuarios se inscriben.
+
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</main>
+
+
+{% include 'components/footer.html' %}
+
+
+<!-- BOOTSTRAP -->
+
+<script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+></script>
+
+
+<!-- LEAFLET -->
+
+<script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+></script>
+
+
+<!-- MAPA DEL ADMIN -->
+
+<script
+    src="{{ url_for('static', filename='js/admin-mapa.js') }}"
+></script>
+```
+
+</body>
+
+</html>

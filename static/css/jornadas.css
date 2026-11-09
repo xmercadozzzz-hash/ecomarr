@@ -1,0 +1,188 @@
+/* =========================================
+   JORNADAS
+========================================= */
+
+:root {
+    --prio-4: #dc3545;   /* crítico */
+    --prio-3: #fd7e14;   /* alto    */
+    --prio-2: #e0a800;   /* medio   */
+    --prio-1: #19a974;   /* bajo    */
+}
+
+.calendario-card {
+    top: 90px;
+    z-index: 1;
+}
+
+/* ---------- calendario ---------- */
+
+.cal-semana,
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+}
+
+.cal-semana {
+    margin-bottom: 6px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-gray, #657783);
+}
+
+.cal-dia {
+    position: relative;
+    aspect-ratio: 1 / 1;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 2px solid transparent;
+    border-radius: 12px;
+
+    background: #f3f7f8;
+    color: var(--text-dark, #123047);
+
+    font-weight: 600;
+    font-size: 14px;
+
+    transition: transform .15s, box-shadow .15s;
+}
+
+.cal-vacio {
+    aspect-ratio: 1 / 1;
+}
+
+.cal-dia:disabled {
+    background: transparent;
+    color: #b8c4ca;
+    cursor: not-allowed;
+}
+
+.cal-dia:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(9, 69, 91, .15);
+}
+
+.cal-dia.hoy {
+    border-color: #087ea4;
+}
+
+.cal-dia.con-jornada {
+    color: #fff;
+    background: var(--c);
+}
+
+.cal-dia.sel {
+    outline: 3px solid #063b5c;
+    outline-offset: 2px;
+}
+
+.cal-dia.sel-vacio {
+    background: #dff5fa;
+    outline: 3px solid #063b5c;
+    outline-offset: 2px;
+}
+
+.cal-cuenta {
+    position: absolute;
+    top: 3px;
+    right: 5px;
+
+    font-size: 10px;
+    line-height: 1;
+    opacity: .9;
+}
+
+/* ---------- leyenda ---------- */
+
+.cal-leyenda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 13px;
+}
+
+.punto {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+}
+
+.punto.prio-4 { background: var(--prio-4); }
+.punto.prio-3 { background: var(--prio-3); }
+.punto.prio-2 { background: var(--prio-2); }
+.punto.prio-1 { background: var(--prio-1); }
+
+/* ---------- colores por prioridad ---------- */
+
+.prio-fondo-4 { background: var(--prio-4); color: #fff; }
+.prio-fondo-3 { background: var(--prio-3); color: #fff; }
+.prio-fondo-2 { background: var(--prio-2); color: #fff; }
+.prio-fondo-1 { background: var(--prio-1); color: #fff; }
+
+.prio-borde-4 { border-left: 6px solid var(--prio-4) !important; }
+.prio-borde-3 { border-left: 6px solid var(--prio-3) !important; }
+.prio-borde-2 { border-left: 6px solid var(--prio-2) !important; }
+.prio-borde-1 { border-left: 6px solid var(--prio-1) !important; }
+
+/* ---------- reportes pendientes ---------- */
+
+.pendientes-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 340px;
+    overflow-y: auto;
+}
+
+.pendiente {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 10px 12px;
+
+    border-radius: 12px;
+    background: #f8fbfc;
+}
+
+/* ---------- lista ---------- */
+
+.jornada-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    font-size: 14px;
+}
+
+.jornada-apagada {
+    opacity: .6;
+}
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chip {
+    padding: 5px 14px;
+
+    border: 1px solid var(--border, #e2edf0);
+    border-radius: 999px;
+
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.chip.activo {
+    background: #063b5c;
+    border-color: #063b5c;
+    color: #fff;
+}

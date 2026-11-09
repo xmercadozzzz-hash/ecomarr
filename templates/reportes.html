@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Explorar reportes | ECOMAR</title>
+
+
+    <!-- Bootstrap -->
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+
+    <!-- Bootstrap Icons -->
+
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    >
+
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+
+        body {
+
+            margin: 0;
+
+            background: #f4f7f9;
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+        }
+
+
+        /* ==================================
+           NAVBAR
+        ================================== */
+
+        .navbar-ecomar {
+
+            height: 80px;
+
+            background: white;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            padding: 0 6%;
+
+            box-shadow:
+                0 2px 10px
+                rgba(0,0,0,0.08);
+
+        }
+
+
+        .logo {
+
+            font-size: 27px;
+
+            font-weight: 700;
+
+            color: #111;
+
+            text-decoration: none;
+
+        }
+
+
+        .logo i {
+
+            margin-right: 6px;
+
+        }
+
+
+        .navbar-buttons {
+
+            display: flex;
+
+            gap: 12px;
+
+        }
+
+
+        .btn-ecomar {
+
+            padding:
+                11px
+                20px;
+
+            border-radius: 9px;
+
+            text-decoration: none;
+
+            font-size: 16px;
+
+            border: 1px solid
+                #0d6efd;
+
+        }
+
+
+        .btn-inicio {
+
+            color: #0d6efd;
+
+            background: white;
+
+        }
+
+
+        .btn-reportar {
+
+            color: white;
+
+            background: #0d6efd;
+
+        }
+
+
+        /* ==================================
+           CONTENIDO
+        ================================== */
+
+        .contenedor {
+
+            width: 86%;
+
+            max-width: 1500px;
+
+            margin:
+                70px auto;
+
+        }
+
+
+        .encabezado {
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            margin-bottom: 35px;
+
+        }
+
+
+        .titulo {
+
+            font-size: 50px;
+
+            font-weight: 700;
+
+            color: #202428;
+
+            margin: 0;
+
+        }
+
+
+        .subtitulo {
+
+            font-size: 21px;
+
+            color: #68747e;
+
+            margin-top: 12px;
+
+        }
+
+
+        /* ==================================
+           GRID
+        ================================== */
+
+        .reportes-grid {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    auto-fill,
+                    minmax(320px, 1fr)
+                );
+
+            gap: 28px;
+
+        }
+
+
+        /* ==================================
+           TARJETA DEL REPORTE
+        ================================== */
+
+        .reporte-card {
+
+            position: relative;
+
+            min-height: 390px;
+
+            border-radius: 14px;
+
+            overflow: hidden;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #0d6efd,
+                    #00a896
+                );
+
+            box-shadow:
+                0 6px 20px
+                rgba(0,0,0,0.12);
+
+            color: white;
+
+        }
+
+
+        /* ==================================
+           FOTO COMO FONDO
+        ================================== */
+
+        .reporte-fondo {
+
+            position: absolute;
+
+            inset: 0;
+
+            width: 100%;
+
+            height: 100%;
+
+            object-fit: cover;
+
+            z-index: 0;
+
+        }
+
+
+        /* ==================================
+           CAPA OSCURA
+        ================================== */
+
+        .reporte-overlay {
+
+            position: absolute;
+
+            inset: 0;
+
+            z-index: 1;
+
+            background:
+                linear-gradient(
+                    to bottom,
+                    rgba(0,0,0,0.25),
+                    rgba(0,0,0,0.88)
+                );
+
+        }
+
+
+        /* ==================================
+           CONTENIDO
+        ================================== */
+
+        .reporte-contenido {
+
+            position: relative;
+
+            z-index: 2;
+
+            height: 100%;
+
+            min-height: 390px;
+
+            padding: 24px;
+
+            display: flex;
+
+            flex-direction: column;
+
+            justify-content: flex-end;
+
+        }
+
+
+        /* ==================================
+           ETIQUETAS
+        ================================== */
+
+        .etiquetas {
+
+            position: absolute;
+
+            top: 20px;
+
+            left: 20px;
+
+            right: 20px;
+
+            display: flex;
+
+            justify-content:
+                space-between;
+
+            gap: 10px;
+
+        }
+
+
+        .badge-tipo {
+
+            background:
+                rgba(13,110,253,0.95);
+
+            padding:
+                7px
+                12px;
+
+            border-radius: 8px;
+
+            font-size: 14px;
+
+            font-weight: 700;
+
+        }
+
+
+        .badge-nivel {
+
+            background:
+                #ffc107;
+
+            color: #111;
+
+            padding:
+                7px
+                12px;
+
+            border-radius: 8px;
+
+            font-size: 14px;
+
+            font-weight: 700;
+
+        }
+
+
+        /* ==================================
+           TEXTO
+        ================================== */
+
+        .reporte-titulo {
+
+            font-size: 28px;
+
+            font-weight: 700;
+
+            margin-bottom: 7px;
+
+        }
+
+
+        .ubicacion {
+
+            font-size: 17px;
+
+            margin-bottom: 18px;
+
+            color:
+                rgba(255,255,255,0.9);
+
+        }
+
+
+        .descripcion {
+
+            font-size: 16px;
+
+            line-height: 1.5;
+
+            color:
+                rgba(255,255,255,0.92);
+
+            margin-bottom: 18px;
+
+        }
+
+
+        .fecha {
+
+            font-size: 14px;
+
+            color:
+                rgba(255,255,255,0.75);
+
+            padding-top: 14px;
+
+            border-top:
+                1px solid
+                rgba(255,255,255,0.25);
+
+        }
+
+
+        /* ==================================
+           BOTÓN ELIMINAR
+        ================================== */
+
+        .btn-eliminar {
+
+            margin-top: 15px;
+
+            width: fit-content;
+
+            padding:
+                8px
+                13px;
+
+            border-radius: 7px;
+
+            border:
+                1px solid
+                rgba(255,255,255,0.7);
+
+            background:
+                rgba(220,53,69,0.9);
+
+            color: white;
+
+            text-decoration: none;
+
+            font-size: 14px;
+
+        }
+
+
+        .btn-eliminar:hover {
+
+            background:
+                #dc3545;
+
+            color: white;
+
+        }
+
+
+        /* ==================================
+           SIN REPORTES
+        ================================== */
+
+        .sin-reportes {
+
+            text-align: center;
+
+            background: white;
+
+            border-radius: 15px;
+
+            padding: 70px 20px;
+
+            box-shadow:
+                0 5px 20px
+                rgba(0,0,0,0.07);
+
+        }
+
+
+        .sin-reportes i {
+
+            font-size: 65px;
+
+            color: #0d6efd;
+
+        }
+
+
+        /* ==================================
+           RESPONSIVE
+        ================================== */
+
+        @media (max-width: 700px) {
+
+            .titulo {
+
+                font-size: 36px;
+
+            }
+
+
+            .encabezado {
+
+                flex-direction: column;
+
+                align-items: flex-start;
+
+                gap: 20px;
+
+            }
+
+
+            .navbar-ecomar {
+
+                padding: 0 4%;
+
+            }
+
+
+            .contenedor {
+
+                width: 92%;
+
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================
+     NAVBAR
+====================================== -->
+
+<nav class="navbar-ecomar">
+
+    <a
+        href="/"
+        class="logo"
+    >
+
+        <i class="bi bi-water"></i>
+
+        ECOMAR
+
+    </a>
+
+
+    <div class="navbar-buttons">
+
+        <a
+            href="/"
+            class="btn-ecomar btn-inicio"
+        >
+
+            Inicio
+
+        </a>
+
+
+        <a
+            href="/reportar"
+            class="btn-ecomar btn-reportar"
+        >
+
+            <i class="bi bi-plus-circle"></i>
+
+            Reportar
+
+        </a>
+
+    </div>
+
+</nav>
+
+
+
+<!-- =====================================
+     CONTENIDO
+====================================== -->
+
+<main class="contenedor">
+
+
+    <div class="encabezado">
+
+        <div>
+
+            <h1 class="titulo">
+                Zonas reportadas
+            </h1>
+
+            <p class="subtitulo">
+                Consulta los lugares afectados por contaminación.
+            </p>
+
+        </div>
+
+
+        <a
+            href="/reportar"
+            class="btn-ecomar btn-reportar"
+        >
+
+            <i class="bi bi-plus-circle"></i>
+
+            Nuevo reporte
+
+        </a>
+
+    </div>
+
+
+
+    <!-- =================================
+         REPORTES
+    ================================== -->
+
+    {% if reportes %}
+
+        <div class="reportes-grid">
+
+
+            {% for reporte in reportes %}
+
+
+                <article class="reporte-card">
+
+
+                    <!-- FOTO -->
+
+                    {% if reporte.fotografia %}
+
+                        <img
+                            src="{{ url_for('static', filename='uploads/' + reporte.fotografia) }}"
+                            class="reporte-fondo"
+                            alt="Fotografía de {{ reporte.nombre_lugar }}"
+                        >
+
+                    {% endif %}
+
+
+                    <!-- OSCURECER FOTO -->
+
+                    <div class="reporte-overlay"></div>
+
+
+
+                    <!-- CONTENIDO -->
+
+                    <div class="reporte-contenido">
+
+
+                        <!-- ETIQUETAS -->
+
+                        <div class="etiquetas">
+
+                            <span class="badge-tipo">
+
+                                {{ reporte.tipo_contaminacion }}
+
+                            </span>
+
+
+                            <span class="badge-nivel">
+
+                                {{ reporte.nivel_afectacion }}
+
+                            </span>
+
+                        </div>
+
+
+
+                        <!-- NOMBRE -->
+
+                        <h2 class="reporte-titulo">
+
+                            {{ reporte.nombre_lugar }}
+
+                        </h2>
+
+
+
+                        <!-- UBICACIÓN -->
+
+                        <div class="ubicacion">
+
+                            <i class="bi bi-geo-alt"></i>
+
+                            {{ reporte.ubicacion }}
+
+                        </div>
+
+
+
+                        <!-- DESCRIPCIÓN -->
+
+                        <p class="descripcion">
+
+                            {{ reporte.descripcion }}
+
+                        </p>
+
+<div class="reportado-por">
+    <i class="bi bi-person-circle"></i>
+    <span>
+        Reportado por:
+        <strong>
+            {{ reporte.usuario_nombre or "Usuario no identificado" }}
+        </strong>
+    </span>
+</div>
+
+                        <!-- FECHA -->
+
+                        <div class="fecha">
+
+                            <i class="bi bi-calendar3"></i>
+
+                            {{ reporte.fecha_reporte }}
+
+                        </div>
+
+
+
+                        <!-- ELIMINAR -->
+
+                       <form
+    action="{{ url_for('eliminar_reporte', id=reporte.id) }}"
+    method="POST"
+    style="display:inline;"
+    onsubmit="return confirm('¿Estás seguro de que deseas eliminar este reporte? Esta acción no se puede deshacer.');"
+>
+    <button type="submit" class="btn btn-danger">
+        <i class="bi bi-trash"></i>
+        Eliminar
+    </button>
+</form>
+
+
+                    </div>
+
+
+                </article>
+
+
+            {% endfor %}
+
+
+        </div>
+
+
+    {% else %}
+
+
+        <div class="sin-reportes">
+
+            <i class="bi bi-inbox"></i>
+
+            <h2 class="mt-3">
+                No hay reportes todavía
+            </h2>
+
+            <p class="text-muted">
+                Sé el primero en reportar una zona contaminada.
+            </p>
+
+
+            <a
+                href="/reportar"
+                class="btn btn-primary"
+            >
+
+                Crear primer reporte
+
+            </a>
+
+        </div>
+
+
+    {% endif %}
+
+
+</main>
+
+
+</body>
+
+</html>

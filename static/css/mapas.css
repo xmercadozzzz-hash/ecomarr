@@ -1,0 +1,71 @@
+/* ============================================================
+   TARJETAS DE REPORTES
+   ============================================================ */
+
+.reportes-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+
+/* ============================================================
+   TARJETA
+   ============================================================ */
+
+.reporte-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 18px;
+    background: #ffffff;
+}
+
+
+/* ============================================================
+   IMAGEN DEL REPORTE
+   ============================================================ */
+
+.reporte-card img,
+.reporte-imagen {
+    width: 100%;
+    height: 220px;
+    display: block;
+    object-fit: cover;
+    object-position: center;
+}
+
+
+/* ============================================================
+   CONTENIDO
+   ============================================================ */
+
+.reporte-card .card-body {
+    padding: 18px;
+}
+
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 992px) {
+
+    .reportes-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+}
+
+
+@media (max-width: 576px) {
+
+    .reportes-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .reporte-card img,
+    .reporte-imagen {
+        height: 200px;
+    }
+
+}
