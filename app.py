@@ -28,8 +28,10 @@ from werkzeug.security import (
 
 app = Flask(__name__)
 
-app.secret_key = "ecomar-clave-secreta-2026"
-
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "clave-local-desarrollo"
+)
 UPLOAD_FOLDER = os.path.join(
     "static",
     "uploads"
@@ -55,14 +57,19 @@ os.makedirs(
 # BASE DE DATOS
 # ============================================================
 
-def conectar_bd():
 
+
+def conectar_bd():
     return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="",
-        database="ecomar"
+        host=os.environ.get("DB_HOST", "localhost"),
+        user=os.environ.get("DB_USER", "root"),
+        password=os.environ.get("DB_PASSWORD", ""),
+        database=os.environ.get("DB_NAME", "ecomar"),
+        port=int(os.environ.get("DB_PORT", "3306")),
+        connection_timeout=15
     )
+
+
 
 
 # ============================================================
