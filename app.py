@@ -181,12 +181,12 @@ def crear_cuenta():
         return redirect(url_for("registro"))
 
     cursor.execute(
-        """
-        INSERT INTO usuarios (nombre, email, password, rol)
-        VALUES (%s, %s, %s, 'usuario')
-        """,
-        (nombre, email, generate_password_hash(password))
-    )
+    """
+    INSERT INTO usuarios (nombre, correo, contrasena, rol)
+    VALUES (%s, %s, %s, 'usuario')
+    """,
+    (nombre, email, generate_password_hash(password))
+)
     conexion.commit()
     usuario_id = cursor.lastrowid
     cerrar_conexion(cursor, conexion)
@@ -224,7 +224,7 @@ def iniciar_sesion():
     cursor = conexion.cursor(dictionary=True)
     cursor.execute(
         """
-        SELECT id, nombre, email, password, rol
+        SELECT id, nombre, correo, contraseña, rol
         FROM usuarios
         WHERE email = %s
         """,
@@ -233,7 +233,7 @@ def iniciar_sesion():
     usuario = cursor.fetchone()
     cerrar_conexion(cursor, conexion)
 
-    if not usuario or not check_password_hash(usuario["password"], password):
+    if not usuario or not check_password_hash(usuario["contrasena"], password):
         flash("El correo o la contraseña son incorrectos.", "danger")
         return redirect(url_for("login"))
 
@@ -269,7 +269,7 @@ def perfil():
 
     cursor.execute(
         """
-        SELECT id, nombre, email, fecha_registro, rol
+        SELECT id, nombre, correo, fecha_registro, rol
         FROM usuarios
         WHERE id = %s
         """,
